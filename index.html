@@ -72,7 +72,8 @@ main{padding-top:56px;min-height:100vh;position:relative;z-index:1}
 .bot-card{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:12px}
 .bot-card:hover{border-color:var(--gold);background:#c9a84c0a}
 .bot-card.selected{border-color:var(--gold);background:#c9a84c14}
-.bot-avatar{font-size:2rem;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--dark)}
+.bot-avatar{font-size:2rem;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--dark);overflow:hidden;flex-shrink:0}
+.bot-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;pointer-events:none}
 .bot-info{flex:1}
 .bot-name{font-family:'Cinzel',serif;font-size:.85rem;color:var(--text)}
 .bot-elo{font-size:.8rem;color:var(--gold)}
@@ -145,14 +146,52 @@ main{padding-top:56px;min-height:100vh;position:relative;z-index:1}
 #bannedScreen{position:fixed;inset:0;background:var(--dark);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
 #bannedScreen h1{font-family:'Cinzel',serif;font-size:3rem;color:var(--error)}
 #bannedScreen p{color:var(--muted);font-style:italic}
-/* Profile view (friend) */
-.profile-view-btn{padding:6px 12px;border-radius:6px;font-size:.78rem;cursor:pointer;font-family:'Cinzel',serif;border:1px solid var(--border);background:transparent;color:var(--muted)}
-.profile-view-btn:hover{color:var(--gold);border-color:var(--gold)}
-/* Notifications */
-.notif-dot{width:8px;height:8px;background:var(--error);border-radius:50%;position:absolute;top:6px;right:6px}
+/* empty state */
 .empty-state{color:var(--muted);text-align:center;font-style:italic;padding:24px}
 /* scrollbar */
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--dark)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+/* Avatar picker for profile */
+.av-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:6px 0 16px}
+.av-pick-item{border:2px solid var(--border);border-radius:12px;padding:12px 8px;cursor:pointer;transition:.2s;text-align:center;background:var(--panel2)}
+.av-pick-item:hover{border-color:var(--gold)}
+.av-pick-item.chosen{border-color:var(--gold);background:#c9a84c14}
+.av-pick-item img{width:70px;height:70px;border-radius:50%;object-fit:cover;pointer-events:none;display:block;margin:0 auto 8px;border:2px solid transparent}
+.av-pick-item.chosen img{border-color:var(--gold)}
+.av-pick-lbl{font-family:'Cinzel',serif;font-size:.72rem;color:var(--muted)}
+.av-pick-item.chosen .av-pick-lbl{color:var(--gold)}
+/* Topbar avatar wrapper */
+.avatar-sm{width:34px;height:34px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:1rem;flex-shrink:0}
+.avatar-sm img{width:100%;height:100%;object-fit:cover;pointer-events:none;border-radius:50%}
+/* Mobile support */
+*{-webkit-tap-highlight-color:transparent}
+input,select,textarea{font-size:16px!important}
+.nav-item,.time-btn,.btn,.sm-btn,.hero-btn,.close-btn{touch-action:manipulation}
+.nav-item{min-height:52px}
+@media(max-width:540px){
+  .overlay{align-items:flex-end;padding:0}
+  .modal{max-height:92vh;border-radius:16px 16px 0 0;margin:0;width:100%;max-width:100%}
+  .modal-header{padding:14px 16px}
+  .modal-body{padding:14px 16px 20px}
+  .bot-grid{grid-template-columns:1fr}
+  .input-row{flex-wrap:wrap}
+  .input-row .btn-muted{flex:1;min-width:0}
+  .friend-actions{flex-wrap:wrap;gap:5px}
+  .sm-btn{padding:8px 12px;font-size:.75rem}
+  .admin-row{flex-wrap:wrap}
+  .hero-btns{flex-direction:column;align-items:stretch;width:100%;max-width:290px}
+  .hero-btn{text-align:center;padding:16px}
+  .topbar{padding:0 12px;gap:10px}
+  .user-elo{font-size:.76rem}
+  .time-btn{padding:11px 14px;font-size:.9rem;min-height:44px}
+  .btn-row{flex-direction:column}
+  .hero h2{font-size:1.65rem}
+  .chat-box{height:160px}
+  .elo-val{font-size:1.75rem}
+  .sidebar{width:82vw;max-width:280px}
+  .nav-item{padding:16px 20px;font-size:1.05rem}
+  .bot-card{padding:12px}
+  .time-btns{gap:6px}
+}
 </style>
 </head>
 <body>
@@ -175,8 +214,14 @@ main{padding-top:56px;min-height:100vh;position:relative;z-index:1}
   <div class="user-elo">
     <strong id="topElo">500</strong> ELO
   </div>
-  <img class="avatar-sm" id="topAvatar" src="" onerror="this.src=''" onclick="openModal('profileModal')" alt="avatar">
+  <div class="avatar-sm" id="topAvatar" onclick="openModal('profileModal')">
+    <span id="topAvatarEmoji">👤</span>
+    <img id="topAvatarImg" src="" alt="avatar">
+  </div>
 </div>
+
+<!-- Sidebar backdrop -->
+<div id="sidebarBackdrop" onclick="closeSidebar()" style="display:none;position:fixed;inset:0;background:#000000aa;z-index:89"></div>
 
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
@@ -278,8 +323,18 @@ main{padding-top:56px;min-height:100vh;position:relative;z-index:1}
   </div>
   <div class="modal-body">
     <div class="profile-header">
-      <img class="avatar-big" id="profileAvatar" src="" onerror="this.style.background='var(--panel2)'" onclick="document.getElementById('avatarUpload').click()" alt="avatar">
-      <input type="file" class="avatar-upload" id="avatarUpload" accept="image/*" onchange="uploadAvatar(event)">
+      <img class="avatar-big" id="profileAvatar" src="" alt="avatar" style="cursor:default;font-size:2rem;display:flex;align-items:center;justify-content:center">
+      <div style="font-family:'Cinzel',serif;font-size:.74rem;color:var(--muted);letter-spacing:.12em;text-align:center;margin:8px 0 10px">CHOOSE AVATAR</div>
+      <div class="av-pick-grid">
+        <div class="av-pick-item" id="avOpt1" onclick="pickAvatar('https://i.ibb.co/Fb6FJQ9g/54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',this)">
+          <img src="https://i.ibb.co/Fb6FJQ9g/54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg" draggable="false" alt="Avatar 1">
+          <div class="av-pick-lbl">Avatar 1</div>
+        </div>
+        <div class="av-pick-item" id="avOpt2" onclick="pickAvatar('https://i.ibb.co/jZhYZky2/68f9ebed-9db3-458f-aa15-b5b6dfc8566c.jpg',this)">
+          <img src="https://i.ibb.co/jZhYZky2/68f9ebed-9db3-458f-aa15-b5b6dfc8566c.jpg" draggable="false" alt="Avatar 2">
+          <div class="av-pick-lbl">Avatar 2</div>
+        </div>
+      </div>
       <div class="p-username" id="profileUsername">-</div>
       <div class="p-id" id="profileId">-</div>
       <div class="p-date" id="profileDate">-</div>
@@ -467,9 +522,10 @@ const BOTS=[
 
 // Auth guard
 onAuthStateChanged(auth,async user=>{
-  if(!user){window.location.href='login.html';return;}
+  if(!user){window.location.replace('login.html');return;}
   currentUser=user;
-  await loadUserData();
+  try{await loadUserData();}
+  catch(e){setTimeout(async()=>{try{await loadUserData();}catch(e2){window.location.replace('login.html');}},2000);}
 });
 
 async function loadUserData(){
@@ -491,12 +547,24 @@ function updateUI(){
     const d=userData.createdAt.toDate?.();
     if(d) document.getElementById('profileDate').textContent=`Joined: ${d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`;
   }
-  document.getElementById('profileAvatar').src=userData.avatar||'';
+  // Update topbar avatar (wrapper with img+emoji)
+  const tAw=document.getElementById('topAvatar');
+  if(tAw){const tImg=tAw.querySelector('img'),tEm=tAw.querySelector('span');
+    if(userData.avatar&&tImg){tImg.src=userData.avatar;tImg.style.display='block';if(tEm)tEm.style.display='none';}
+    else{if(tImg)tImg.style.display='none';if(tEm)tEm.style.display='block';}}
+  // Profile avatar
+  const pAv=document.getElementById('profileAvatar');
+  if(pAv)pAv.src=userData.avatar||'';
+  // Mark chosen preset
+  document.querySelectorAll('.av-pick-item').forEach(el=>{
+    const src=(el.querySelector('img')?.src||'');
+    el.classList.toggle('chosen',userData.avatar&&(src.includes(userData.avatar)||userData.avatar.includes(src.split('/').pop())));
+  });
   // History
   const hl=document.getElementById('historyList');
   const hist=userData.gameHistory||[];
-  if(hist.length===0){hl.innerHTML='<div class="empty-state">No games yet</div>';}
-  else{hl.innerHTML=hist.slice().reverse().map(h=>`<div class="history-item ${h.result}"><span>Vs ${h.opponent}</span><span>${h.result.toUpperCase()}</span></div>`).join('');}
+  if(!hist.length){hl.innerHTML='<div class="empty-state">No games yet</div>';}
+  else{hl.innerHTML=hist.slice().reverse().map(h=>`<div class="history-item ${h.result||'draw'}"><span>Vs ${h.opponent||'?'}</span><span>${(h.result||'draw').toUpperCase()}</span></div>`).join('');}
   // Admin
   if(userData.isOwner||userData.isAdmin){document.getElementById('adminNavItem').style.display='flex';}
   // Bot grid
@@ -594,21 +662,23 @@ window.cancelSearch=async function(){
   closeModal('searchingModal');
 };
 
-// Avatar upload
-window.uploadAvatar=async function(e){
-  const file=e.target.files[0];if(!file)return;
-  const r=ref(storage,`avatars/${currentUser.uid}`);
-  await uploadBytes(r,file);
-  const url=await getDownloadURL(r);
+// Avatar preset picker (no file upload)
+window.pickAvatar=async function(url,el){
+  document.querySelectorAll('.av-pick-item').forEach(e=>e.classList.remove('chosen'));
+  el.classList.add('chosen');
   await updateDoc(doc(db,'users',currentUser.uid),{avatar:url});
   userData.avatar=url;
-  document.getElementById('profileAvatar').src=url;
-  document.getElementById('topAvatar').src=url;
+  const pAv=document.getElementById('profileAvatar');
+  if(pAv)pAv.src=url;
+  // Update topbar
+  const tAw=document.getElementById('topAvatar');
+  if(tAw){const tImg=tAw.querySelector('img'),tEm=tAw.querySelector('span');
+    if(tImg){tImg.src=url;tImg.style.display='block';if(tEm)tEm.style.display='none';}}
 };
 
 // Logout / Delete
 window.doLogout=async function(){
-  await signOut(auth);window.location.href='login.html';
+  await signOut(auth);window.location.replace('login.html');
 };
 window.deleteAccount=async function(){
   if(!confirm('Delete your account permanently? This cannot be undone.'))return;
@@ -702,9 +772,13 @@ function setupInboxListener(){
     const badge=document.getElementById('inboxBadge');
     if(reqs.length>0){badge.textContent=reqs.length;badge.style.display='';}
     else badge.style.display='none';
-    // Update ELO live
     document.getElementById('topElo').textContent=userData.elo||500;
     document.getElementById('profileElo').textContent=userData.elo||500;
+    // Update topbar avatar
+    const tAw=document.getElementById('topAvatar');
+    if(tAw){const tImg=tAw.querySelector('img'),tEm=tAw.querySelector('span');
+      if(userData.avatar&&tImg){tImg.src=userData.avatar;tImg.style.display='block';if(tEm)tEm.style.display='none';}
+      else{if(tImg)tImg.style.display='none';if(tEm)tEm.style.display='block';}}
     if(userData.banned){document.getElementById('bannedScreen').style.display='flex';}
   });
 }
@@ -850,6 +924,7 @@ window.unbanPlayer=async function(){
 
 // Modal helpers
 window.openModal=function(id){
+  closeAllDropdowns();
   document.getElementById(id).classList.add('show');
   if(id==='profileModal') updateUI();
   if(id==='friendsModal') loadFriends();
@@ -860,14 +935,33 @@ window.closeModal=function(id){document.getElementById(id).classList.remove('sho
 window.closeOnBg=function(e,id){if(e.target.id===id)closeModal(id)};
 window.openPlayOnline=function(){closeAllDropdowns();openModal('playOnlineModal')};
 window.openPlayBot=function(){closeAllDropdowns();openModal('playBotModal')};
-function closeAllDropdowns(){document.getElementById('sidebar').classList.remove('open');document.getElementById('menuBtn').classList.remove('open');}
+function closeAllDropdowns(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('menuBtn').classList.remove('open');
+  const bd=document.getElementById('sidebarBackdrop');if(bd)bd.style.display='none';
+}
 </script>
 
 <script>
 window.toggleSidebar=function(){
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('menuBtn').classList.toggle('open');
+  const open=document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('menuBtn').classList.toggle('open',open);
+  const bd=document.getElementById('sidebarBackdrop');
+  if(bd)bd.style.display=open?'block':'none';
 };
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('menuBtn').classList.remove('open');
+  const bd=document.getElementById('sidebarBackdrop');
+  if(bd)bd.style.display='none';
+}
+// Close sidebar when tapping outside on mobile
+document.addEventListener('click',function(e){
+  const sb=document.getElementById('sidebar'),mb=document.getElementById('menuBtn');
+  if(sb.classList.contains('open')&&!sb.contains(e.target)&&!mb.contains(e.target)){
+    closeSidebar();
+  }
+});
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('keydown',e=>{if(e.key==='F12'||(e.ctrlKey&&['u','s','i'].includes(e.key)))e.preventDefault()});
 </script>
