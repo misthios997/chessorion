@@ -174,7 +174,7 @@
         <input type="password" id="loginPass" placeholder="Enter password">
       </div>
       <div class="forgot"><a onclick="forgotPw()">Forgot password?</a></div>
-      <button class="btn btn-primary" onclick="doLogin()">Enter the Board</button>
+      <button class="btn btn-primary" id="loginBtn" data-label="Enter the Board" onclick="doLogin()">Enter the Board</button>
     </div>
 
     <!-- Register Panel -->
@@ -196,7 +196,7 @@
         <label>Confirm Password</label>
         <input type="password" id="regPass2" placeholder="Repeat password">
       </div>
-      <button class="btn btn-primary" onclick="doRegister()">Create Account</button>
+      <button class="btn btn-primary" id="regBtn" data-label="Create Account" onclick="doRegister()">Create Account</button>
     </div>
   </div>
 </div>
@@ -204,10 +204,14 @@
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, serverTimestamp }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  onAuthStateChanged, sendPasswordResetEmail, setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, getDoc, serverTimestamp,
+  enableIndexedDbPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey:"AIzaSyBDFWnGF4gG7nRrqwGAlxL-EOZiSPXs7kM",
@@ -218,104 +222,186 @@ const firebaseConfig = {
   appId:"1:936378240439:web:7a578803271ea9b7a52c32",
   measurementId:"G-EKJ7MJZ56Z"
 };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Check if already logged in
-onAuthStateChanged(auth, async user=>{
-  if(user){
-    const uDoc = await getDoc(doc(db,'users',user.uid));
-    if(uDoc.exists()){
-      const d = uDoc.data();
-      if(d.banned){
-        auth.signOut();
-        showMsg('loginMsg','error','Your account has been banned.');
-        hideLoader();return;
-      }
-    }
-    window.location.href='index.html';
+// Set auth persistence
+await setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+// Only redirect if already logged in (don't await Firestore on auth state - just check auth)
+let authChecked = false;
+onAuthStateChanged(auth, user => {
+  if (authChecked) return; // Only run once on page load
+  authChecked = true;
+  if (user) {
+    // User already logged in, redirect silently
+    window.location.replace('index.html');
   } else {
     hideLoader();
   }
 });
 
+// Safety fallback: hide loader after 3s even if Firebase hangs
+setTimeout(hideLoader, 3000);
+
 function hideLoader(){
-  document.getElementById('loadOverlay').classList.add('hidden');
+  const ov = document.getElementById('loadOverlay');
+  if(ov) ov.classList.add('hidden');
 }
 
-function showMsg(id,type,text){
-  const el=document.getElementById(id);
-  el.className='msg '+type;el.textContent=text;
+function showMsg(id, type, text){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = 'msg ' + type;
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
+function hideMsg(id){
+  const el = document.getElementById(id);
+  if(el){ el.style.display = 'none'; }
+}
+
+function setLoading(btnId, loading){
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Please wait...' : btn.dataset.label;
 }
 
 function genPlayerId(){
-  return 'CO-'+Math.random().toString(36).substr(2,8).toUpperCase();
+  return 'CO-' + Math.random().toString(36).substr(2,8).toUpperCase();
 }
 
-window.switchTab=function(tab){
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='login'?0:1)));
-  document.getElementById('loginPanel').classList.toggle('active',tab==='login');
-  document.getElementById('registerPanel').classList.toggle('active',tab==='register');
+window.switchTab = function(tab){
+  document.querySelectorAll('.tab').forEach((t,i) =>
+    t.classList.toggle('active', i === (tab === 'login' ? 0 : 1))
+  );
+  document.getElementById('loginPanel').classList.toggle('active', tab === 'login');
+  document.getElementById('registerPanel').classList.toggle('active', tab === 'register');
+  hideMsg('loginMsg'); hideMsg('regMsg');
 };
 
-window.doLogin=async function(){
-  const user=document.getElementById('loginUser').value.trim();
-  const pass=document.getElementById('loginPass').value;
-  if(!user||!pass){showMsg('loginMsg','error','Please fill all fields.');return;}
-  try{
-    // Find email by username
-    const uRef=doc(db,'usernames',user.toLowerCase());
-    const uSnap=await getDoc(uRef);
-    if(!uSnap.exists()){showMsg('loginMsg','error','Username not found.');return;}
-    const email=uSnap.data().email;
-    await signInWithEmailAndPassword(auth,email,pass);
-    // Auth state change will redirect
-  }catch(e){
-    showMsg('loginMsg','error',e.message.replace('Firebase: ','').replace(/\(auth.*\)/,''));
+window.doLogin = async function(){
+  const username = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if(!username || !pass){ showMsg('loginMsg','error','Please fill in all fields.'); return; }
+
+  hideMsg('loginMsg');
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Signing in...';
+
+  try {
+    // Look up email from username doc
+    const uRef = doc(db, 'usernames', username.toLowerCase());
+    let uSnap;
+    try {
+      uSnap = await getDoc(uRef);
+    } catch(fetchErr) {
+      showMsg('loginMsg','error','Connection error. Check your internet and try again.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    if(!uSnap.exists()){
+      showMsg('loginMsg','error','Username not found. Check spelling or register first.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    const email = uSnap.data().email;
+    await signInWithEmailAndPassword(auth, email, pass);
+    // Redirect on success
+    window.location.replace('index.html');
+
+  } catch(e) {
+    let msg = e.message || 'Login failed.';
+    if(e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') msg = 'Wrong password.';
+    else if(e.code === 'auth/user-not-found') msg = 'No account found with this username.';
+    else if(e.code === 'auth/too-many-requests') msg = 'Too many attempts. Try again later.';
+    else if(e.code === 'auth/network-request-failed') msg = 'Network error. Check your internet connection.';
+    showMsg('loginMsg','error', msg);
+    btn.disabled = false; btn.textContent = orig;
   }
 };
 
-window.doRegister=async function(){
-  const username=document.getElementById('regUser').value.trim();
-  const email=document.getElementById('regEmail').value.trim();
-  const pass=document.getElementById('regPass').value;
-  const pass2=document.getElementById('regPass2').value;
-  if(!username||!email||!pass||!pass2){showMsg('regMsg','error','Please fill all fields.');return;}
-  if(pass!==pass2){showMsg('regMsg','error','Passwords do not match.');return;}
-  if(pass.length<6){showMsg('regMsg','error','Password must be at least 6 characters.');return;}
-  if(!/^[a-zA-Z0-9_]{3,20}$/.test(username)){showMsg('regMsg','error','Username: 3-20 chars, letters/numbers/underscore only.');return;}
-  try{
-    // Check username taken
-    const uRef=doc(db,'usernames',username.toLowerCase());
-    const uSnap=await getDoc(uRef);
-    if(uSnap.exists()){showMsg('regMsg','error','Username already taken.');return;}
+window.doRegister = async function(){
+  const username = document.getElementById('regUser').value.trim();
+  const email    = document.getElementById('regEmail').value.trim();
+  const pass     = document.getElementById('regPass').value;
+  const pass2    = document.getElementById('regPass2').value;
 
-    const cred=await createUserWithEmailAndPassword(auth,email,pass);
-    const uid=cred.user.uid;
-    const pid=genPlayerId();
-    const now=serverTimestamp();
-    await setDoc(doc(db,'users',uid),{
-      username,email,uid,playerId:pid,elo:500,
-      createdAt:now,banned:false,isAdmin:false,
-      isOwner:username==='Jovan',
-      avatar:'',gameHistory:[],friends:[],friendRequests:[]
+  if(!username||!email||!pass||!pass2){ showMsg('regMsg','error','Please fill in all fields.'); return; }
+  if(pass !== pass2){ showMsg('regMsg','error','Passwords do not match.'); return; }
+  if(pass.length < 6){ showMsg('regMsg','error','Password must be at least 6 characters.'); return; }
+  if(!/^[a-zA-Z0-9_]{3,20}$/.test(username)){
+    showMsg('regMsg','error','Username: 3–20 chars, letters/numbers/underscore only.'); return;
+  }
+
+  hideMsg('regMsg');
+  const btn = document.getElementById('regBtn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Creating account...';
+
+  try {
+    // Check if username taken
+    const uRef = doc(db, 'usernames', username.toLowerCase());
+    let uSnap;
+    try {
+      uSnap = await getDoc(uRef);
+    } catch(fetchErr) {
+      showMsg('regMsg','error','Connection error. Check your internet and try again.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    if(uSnap.exists()){
+      showMsg('regMsg','error','Username already taken. Choose another.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    // Create auth user
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const uid = cred.user.uid;
+    const pid = genPlayerId();
+
+    // Save user doc
+    await setDoc(doc(db, 'users', uid), {
+      username, email, uid, playerId: pid, elo: 500,
+      createdAt: serverTimestamp(),
+      banned: false, isAdmin: false,
+      isOwner: username === 'Jovan',
+      avatar: '', gameHistory: [], friends: [], friendRequests: []
     });
-    await setDoc(doc(db,'usernames',username.toLowerCase()),{uid,email});
-    // Will redirect via onAuthStateChanged
-  }catch(e){
-    showMsg('regMsg','error',e.message.replace('Firebase: ','').replace(/\(auth.*\)/,''));
+    // Save username lookup
+    await setDoc(doc(db, 'usernames', username.toLowerCase()), { uid, email });
+
+    showMsg('regMsg','success','Account created! Redirecting...');
+    setTimeout(()=> window.location.replace('index.html'), 800);
+
+  } catch(e) {
+    let msg = e.message || 'Registration failed.';
+    if(e.code === 'auth/email-already-in-use') msg = 'Email already in use. Try logging in.';
+    else if(e.code === 'auth/invalid-email') msg = 'Invalid email address.';
+    else if(e.code === 'auth/network-request-failed') msg = 'Network error. Check your internet connection.';
+    showMsg('regMsg','error', msg);
+    btn.disabled = false; btn.textContent = orig;
   }
 };
 
-window.forgotPw=async function(){
-  const user=document.getElementById('loginUser').value.trim();
-  if(!user){showMsg('loginMsg','error','Enter your username first.');return;}
-  const uRef=doc(db,'usernames',user.toLowerCase());
-  const uSnap=await getDoc(uRef);
-  if(!uSnap.exists()){showMsg('loginMsg','error','Username not found.');return;}
-  await sendPasswordResetEmail(auth,uSnap.data().email);
-  showMsg('loginMsg','success','Password reset email sent!');
+window.forgotPw = async function(){
+  const username = document.getElementById('loginUser').value.trim();
+  if(!username){ showMsg('loginMsg','error','Enter your username above first.'); return; }
+  try {
+    const uSnap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
+    if(!uSnap.exists()){ showMsg('loginMsg','error','Username not found.'); return; }
+    await sendPasswordResetEmail(auth, uSnap.data().email);
+    showMsg('loginMsg','success','Password reset email sent! Check your inbox.');
+  } catch(e) {
+    showMsg('loginMsg','error','Could not send reset email. Try again.');
+  }
 };
 </script>
 
