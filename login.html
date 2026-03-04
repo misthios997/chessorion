@@ -128,19 +128,23 @@
 <div class="stars" id="stars"></div>
 <div class="board-bg"></div>
 <svg class="constellation" viewBox="0 0 1440 900">
+  <!-- Orion belt stars -->
   <circle cx="720" cy="200" r="3" fill="#c9a84c"/>
   <circle cx="760" cy="210" r="2" fill="#c9a84c"/>
   <circle cx="800" cy="200" r="3" fill="#c9a84c"/>
   <line x1="720" y1="200" x2="760" y2="210" stroke="#c9a84c" stroke-width="1"/>
   <line x1="760" y1="210" x2="800" y2="200" stroke="#c9a84c" stroke-width="1"/>
+  <!-- Shoulders -->
   <circle cx="660" cy="130" r="4" fill="#aaddff"/>
   <circle cx="860" cy="120" r="5" fill="#ffaaaa"/>
   <line x1="660" y1="130" x2="720" y2="200" stroke="#c9a84c" stroke-width=".8"/>
   <line x1="860" y1="120" x2="800" y2="200" stroke="#c9a84c" stroke-width=".8"/>
+  <!-- Feet -->
   <circle cx="680" cy="310" r="3" fill="#aaddff"/>
   <circle cx="840" cy="320" r="4" fill="#aaddff"/>
   <line x1="720" y1="200" x2="680" y2="310" stroke="#c9a84c" stroke-width=".8"/>
   <line x1="800" y1="200" x2="840" y2="320" stroke="#c9a84c" stroke-width=".8"/>
+  <!-- Head -->
   <circle cx="750" cy="60" r="3" fill="#ffffaa"/>
   <line x1="660" y1="130" x2="750" y2="60" stroke="#c9a84c" stroke-width=".6"/>
   <line x1="860" y1="120" x2="750" y2="60" stroke="#c9a84c" stroke-width=".6"/>
@@ -158,6 +162,7 @@
       <div class="tab" onclick="switchTab('register')">Register</div>
     </div>
 
+    <!-- Login Panel -->
     <div class="panel active" id="loginPanel">
       <div id="loginMsg" class="msg"></div>
       <div class="form-group">
@@ -169,9 +174,10 @@
         <input type="password" id="loginPass" placeholder="Enter password">
       </div>
       <div class="forgot"><a onclick="forgotPw()">Forgot password?</a></div>
-      <button class="btn btn-primary" onclick="doLogin()">Enter the Board</button>
+      <button class="btn btn-primary" id="loginBtn" data-label="Enter the Board" onclick="doLogin()">Enter the Board</button>
     </div>
 
+    <!-- Register Panel -->
     <div class="panel" id="registerPanel">
       <div id="regMsg" class="msg"></div>
       <div class="form-group">
@@ -190,17 +196,22 @@
         <label>Confirm Password</label>
         <input type="password" id="regPass2" placeholder="Repeat password">
       </div>
-      <button class="btn btn-primary" onclick="doRegister()">Create Account</button>
+      <button class="btn btn-primary" id="regBtn" data-label="Create Account" onclick="doRegister()">Create Account</button>
     </div>
   </div>
 </div>
 
+<!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, serverTimestamp }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  onAuthStateChanged, sendPasswordResetEmail, setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, getDoc, serverTimestamp,
+  enableIndexedDbPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey:"AIzaSyBDFWnGF4gG7nRrqwGAlxL-EOZiSPXs7kM",
@@ -211,133 +222,219 @@ const firebaseConfig = {
   appId:"1:936378240439:web:7a578803271ea9b7a52c32",
   measurementId:"G-EKJ7MJZ56Z"
 };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Check if already logged in (Dengan Perbaikan Race Condition)
-onAuthStateChanged(auth, async user => {
-  if(user){
-    const uDoc = await getDoc(doc(db, 'users', user.uid));
-    if(uDoc.exists()){
-      const d = uDoc.data();
-      if(d.banned){
-        auth.signOut();
-        showMsg('loginMsg', 'error', 'Your account has been banned.');
-        hideLoader();
-        return;
-      }
-      window.location.href = 'index.html';
-    } else {
-      hideLoader();
-    }
+// Set auth persistence
+await setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+// Only redirect if already logged in (don't await Firestore on auth state - just check auth)
+let initialCheckDone = false;
+onAuthStateChanged(auth, user => {
+  if(initialCheckDone) return;
+  initialCheckDone = true;
+  if(user) {
+    window.location.replace('index.html');
   } else {
     hideLoader();
   }
 });
 
+// Safety fallback: hide loader after 3s even if Firebase hangs
+setTimeout(hideLoader, 3000);
+
 function hideLoader(){
-  document.getElementById('loadOverlay').classList.add('hidden');
+  const ov = document.getElementById('loadOverlay');
+  if(ov) ov.classList.add('hidden');
 }
 
 function showMsg(id, type, text){
   const el = document.getElementById(id);
+  if(!el) return;
   el.className = 'msg ' + type;
   el.textContent = text;
+  el.style.display = 'block';
+}
+
+function hideMsg(id){
+  const el = document.getElementById(id);
+  if(el){ el.style.display = 'none'; }
+}
+
+function setLoading(btnId, loading){
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Please wait...' : btn.dataset.label;
 }
 
 function genPlayerId(){
-  return 'CO-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+  return 'CO-' + Math.random().toString(36).substr(2,8).toUpperCase();
 }
 
 window.switchTab = function(tab){
-  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === (tab === 'login' ? 0 : 1)));
+  document.querySelectorAll('.tab').forEach((t,i) =>
+    t.classList.toggle('active', i === (tab === 'login' ? 0 : 1))
+  );
   document.getElementById('loginPanel').classList.toggle('active', tab === 'login');
   document.getElementById('registerPanel').classList.toggle('active', tab === 'register');
+  hideMsg('loginMsg'); hideMsg('regMsg');
 };
 
 window.doLogin = async function(){
-  const user = document.getElementById('loginUser').value.trim();
+  const usernameOrEmail = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value;
-  if(!user || !pass){ showMsg('loginMsg', 'error', 'Please fill all fields.'); return; }
+  if(!usernameOrEmail || !pass){ showMsg('loginMsg','error','Please fill in all fields.'); return; }
+
+  hideMsg('loginMsg');
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Signing in...';
+
   try {
-    const uRef = doc(db, 'usernames', user.toLowerCase());
-    const uSnap = await getDoc(uRef);
-    if(!uSnap.exists()){ showMsg('loginMsg', 'error', 'Username not found.'); return; }
-    const email = uSnap.data().email;
+    let email = usernameOrEmail;
+
+    // If not an email, look up by username
+    if(!usernameOrEmail.includes('@')) {
+      let uSnap;
+      try {
+        uSnap = await getDoc(doc(db, 'usernames', usernameOrEmail.toLowerCase()));
+      } catch(fetchErr) {
+        showMsg('loginMsg','error','Connection error. Check your internet and try again.');
+        btn.disabled = false; btn.textContent = orig; return;
+      }
+      if(!uSnap.exists()){
+        showMsg('loginMsg','error','Username not found. Check spelling or register first.');
+        btn.disabled = false; btn.textContent = orig; return;
+      }
+      email = uSnap.data().email;
+    }
+
     await signInWithEmailAndPassword(auth, email, pass);
+    window.location.replace('index.html');
+
   } catch(e) {
-    showMsg('loginMsg', 'error', e.message.replace('Firebase: ', '').replace(/\(auth.*\)/, ''));
+    let msg = 'Wrong username or password.';
+    const code = e.code || '';
+    if(code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+      msg = 'Wrong password. Please try again.';
+    } else if(code === 'auth/too-many-requests') {
+      msg = 'Too many attempts. Try again later.';
+    } else if(code === 'auth/network-request-failed') {
+      msg = 'Network error. Check your internet connection.';
+    } else if(code === 'auth/invalid-email') {
+      msg = 'Invalid email format.';
+    } else if(code) {
+      msg = 'Login failed: ' + code;
+    }
+    showMsg('loginMsg','error', msg);
+    btn.disabled = false; btn.textContent = orig;
   }
 };
 
 window.doRegister = async function(){
   const username = document.getElementById('regUser').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const pass = document.getElementById('regPass').value;
-  const pass2 = document.getElementById('regPass2').value;
-  if(!username || !email || !pass || !pass2){ showMsg('regMsg', 'error', 'Please fill all fields.'); return; }
-  if(pass !== pass2){ showMsg('regMsg', 'error', 'Passwords do not match.'); return; }
-  if(pass.length < 6){ showMsg('regMsg', 'error', 'Password must be at least 6 characters.'); return; }
-  if(!/^[a-zA-Z0-9_]{3,20}$/.test(username)){ showMsg('regMsg', 'error', 'Username: 3-20 chars, letters/numbers/underscore only.'); return; }
-  
-  try {
-    const uRef = doc(db, 'usernames', username.toLowerCase());
-    const uSnap = await getDoc(uRef);
-    if(uSnap.exists()){ showMsg('regMsg', 'error', 'Username already taken.'); return; }
+  const email    = document.getElementById('regEmail').value.trim();
+  const pass     = document.getElementById('regPass').value;
+  const pass2    = document.getElementById('regPass2').value;
 
+  if(!username||!email||!pass||!pass2){ showMsg('regMsg','error','Please fill in all fields.'); return; }
+  if(pass !== pass2){ showMsg('regMsg','error','Passwords do not match.'); return; }
+  if(pass.length < 6){ showMsg('regMsg','error','Password must be at least 6 characters.'); return; }
+  if(!/^[a-zA-Z0-9_]{3,20}$/.test(username)){
+    showMsg('regMsg','error','Username: 3–20 chars, letters/numbers/underscore only.'); return;
+  }
+
+  hideMsg('regMsg');
+  const btn = document.getElementById('regBtn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Creating account...';
+
+  try {
+    // Check if username taken
+    const uRef = doc(db, 'usernames', username.toLowerCase());
+    let uSnap;
+    try {
+      uSnap = await getDoc(uRef);
+    } catch(fetchErr) {
+      showMsg('regMsg','error','Connection error. Check your internet and try again.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    if(uSnap.exists()){
+      showMsg('regMsg','error','Username already taken. Choose another.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    // Create auth user
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     const uid = cred.user.uid;
     const pid = genPlayerId();
-    const now = serverTimestamp();
-    
+
+    // Save user doc
     await setDoc(doc(db, 'users', uid), {
       username, email, uid, playerId: pid, elo: 500,
-      createdAt: now, banned: false, isAdmin: false,
+      createdAt: serverTimestamp(),
+      banned: false, isAdmin: false,
       isOwner: username === 'Jovan',
       avatar: '', gameHistory: [], friends: [], friendRequests: []
     });
+    // Save username lookup
     await setDoc(doc(db, 'usernames', username.toLowerCase()), { uid, email });
-    
-    window.location.href = 'index.html';
+
+    showMsg('regMsg','success','Account created! Redirecting...');
+    window.location.replace('index.html');
+
   } catch(e) {
-    showMsg('regMsg', 'error', e.message.replace('Firebase: ', '').replace(/\(auth.*\)/, ''));
+    let msg = e.message || 'Registration failed.';
+    if(e.code === 'auth/email-already-in-use') msg = 'Email already in use. Try logging in.';
+    else if(e.code === 'auth/invalid-email') msg = 'Invalid email address.';
+    else if(e.code === 'auth/network-request-failed') msg = 'Network error. Check your internet connection.';
+    showMsg('regMsg','error', msg);
+    btn.disabled = false; btn.textContent = orig;
   }
 };
 
 window.forgotPw = async function(){
-  const user = document.getElementById('loginUser').value.trim();
-  if(!user){ showMsg('loginMsg', 'error', 'Enter your username first.'); return; }
-  const uRef = doc(db, 'usernames', user.toLowerCase());
-  const uSnap = await getDoc(uRef);
-  if(!uSnap.exists()){ showMsg('loginMsg', 'error', 'Username not found.'); return; }
-  await sendPasswordResetEmail(auth, uSnap.data().email);
-  showMsg('loginMsg', 'success', 'Password reset email sent!');
+  const username = document.getElementById('loginUser').value.trim();
+  if(!username){ showMsg('loginMsg','error','Enter your username above first.'); return; }
+  try {
+    const uSnap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
+    if(!uSnap.exists()){ showMsg('loginMsg','error','Username not found.'); return; }
+    await sendPasswordResetEmail(auth, uSnap.data().email);
+    showMsg('loginMsg','success','Password reset email sent! Check your inbox.');
+  } catch(e) {
+    showMsg('loginMsg','error','Could not send reset email. Try again.');
+  }
 };
 </script>
 
 <script>
 // Stars
 (()=>{
-  const c = document.getElementById('stars');
-  for(let i = 0; i < 120; i++){
-    const s = document.createElement('div');
-    s.className = 'star';
-    const sz = Math.random() * 2.5 + .5;
-    s.style.cssText = `width:${sz}px;height:${sz}px;top:${Math.random() * 100}%;left:${Math.random() * 100}%;--t:${2 + Math.random() * 4}s;opacity:${Math.random() * .6}`;
+  const c=document.getElementById('stars');
+  for(let i=0;i<120;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=Math.random()*2.5+.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--t:${2+Math.random()*4}s;opacity:${Math.random()*.6}`;
     c.appendChild(s);
   }
 })();
 
 // Disable right-click
-document.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('keydown', e => {
-  if(e.key === 'F12' || (e.ctrlKey && (e.key === 'u' || e.key === 's' || e.key === 'i'))){ e.preventDefault(); }
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{
+  if(e.key==='F12'||(e.ctrlKey&&(e.key==='u'||e.key==='s'||e.key==='i'))){e.preventDefault();}
 });
 
 // Enter key support
-document.addEventListener('keydown', e => {
-  if(e.key === 'Enter'){
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
     if(document.getElementById('loginPanel').classList.contains('active')) window.doLogin?.();
     else window.doRegister?.();
   }
