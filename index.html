@@ -513,11 +513,11 @@ let currentUser=null, userData=null, selectedTime=null, selectedBot=null, search
 
 // Bots config
 const BOTS=[
-  {name:'Pieter',elo:1250,img:'https://i.ibb.co/Wv34J1qd/1771424229420.png'},
-  {name:'Maria',elo:1600,img:'https://i.ibb.co/WvqDx4nn/1771422684683.png'},
-  {name:'Hikaru',elo:2840,img:'https://i.ibb.co/HvvdN1n/1771421778737.png'},
-  {name:'Magnus',elo:2882,img:'https://i.ibb.co/Q3DM9Vhr/1771421721788.png'},
-  {name:'Engine',elo:3200,emoji:'💿'},
+  {name:'Pieter',elo:1250,emoji:'🧑',color:'#4a7fa5'},
+  {name:'Maria',elo:1600,emoji:'👩',color:'#a54a7f'},
+  {name:'Hikaru',elo:2840,emoji:'⚡',color:'#5a7fa5'},
+  {name:'Magnus',elo:2882,emoji:'👑',color:'#c9a84c'},
+  {name:'Engine',elo:3200,emoji:'💿',color:'#555577'},
 ];
 
 // Auth guard
@@ -575,7 +575,7 @@ function buildBotGrid(){
   const g=document.getElementById('botGrid');
   g.innerHTML=BOTS.map((b,i)=>`
     <div class="bot-card" data-i="${i}" onclick="selectBot(${i},this)">
-      <div class="bot-avatar">${b.emoji?b.emoji:`<img src="${b.img}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;pointer-events:none" draggable="false">`}</div>
+      <div class="bot-avatar" style="background:${b.color||'#1a1a28'};font-size:1.6rem">${b.emoji||'🤖'}</div>
       <div class="bot-info"><div class="bot-name">${b.name}</div><div class="bot-elo">${b.elo} ELO</div></div>
     </div>`).join('');
 }
