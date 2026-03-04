@@ -231,7 +231,7 @@ input,select,textarea{font-size:16px!important}
   <div class="nav-item" onclick="openModal('profileModal')"><span class="ico">👤</span> Profile</div>
   <div class="nav-item" onclick="openModal('inboxModal')"><span class="ico">📬</span> Inbox <span class="nav-badge" id="inboxBadge" style="display:none">0</span></div>
   <div class="nav-item" onclick="openModal('friendsModal')"><span class="ico">➕</span> Add Friend</div>
-  <div class="nav-item" onclick="openModal('updateModal')"><span class="ico">🔄</span> Update</div>
+  <div class="nav-item" id="updateNavItem" onclick="openModal('updateModal')"><span class="ico">🔄</span> Update</div>
   <div class="nav-item" id="adminNavItem" style="display:none" onclick="openModal('adminModal')"><span class="ico">⚙️</span> Admin Panel</div>
 </div>
 
@@ -513,11 +513,11 @@ let currentUser=null, userData=null, selectedTime=null, selectedBot=null, search
 
 // Bots config
 const BOTS=[
-  {name:'Pieter',elo:1250,emoji:'🧑',color:'#4a7fa5'},
-  {name:'Maria',elo:1600,emoji:'👩',color:'#a54a7f'},
-  {name:'Hikaru',elo:2840,emoji:'⚡',color:'#5a7fa5'},
-  {name:'Magnus',elo:2882,emoji:'👑',color:'#c9a84c'},
-  {name:'Engine',elo:3200,emoji:'💿',color:'#555577'},
+  {name:'Pieter',elo:1250,img:'https://i.ibb.co/Wv34J1qd/1771424229420.png'},
+  {name:'Maria',elo:1600,img:'https://i.ibb.co/WvqDx4nn/1771422684683.png'},
+  {name:'Hikaru',elo:2840,img:'https://i.ibb.co/HvvdN1n/1771421778737.png'},
+  {name:'Magnus',elo:2882,img:'https://i.ibb.co/Q3DM9Vhr/1771421721788.png'},
+  {name:'Engine',elo:3200,emoji:'💿'},
 ];
 
 // Auth guard
@@ -535,6 +535,7 @@ async function loadUserData(){
   if(userData.banned){document.getElementById('bannedScreen').style.display='flex';return;}
   updateUI();
   setupInboxListener();
+  setupUpdateListener();
 }
 
 function updateUI(){
@@ -547,14 +548,21 @@ function updateUI(){
     const d=userData.createdAt.toDate?.();
     if(d) document.getElementById('profileDate').textContent=`Joined: ${d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`;
   }
-  // Update topbar avatar (wrapper with img+emoji)
-  const tAw=document.getElementById('topAvatar');
-  if(tAw){const tImg=tAw.querySelector('img'),tEm=tAw.querySelector('span');
-    if(userData.avatar&&tImg){tImg.src=userData.avatar;tImg.style.display='block';if(tEm)tEm.style.display='none';}
-    else{if(tImg)tImg.style.display='none';if(tEm)tEm.style.display='block';}}
-  // Profile avatar
+  // Update topbar avatar
+  const tImg=document.getElementById('topAvatarImg'),tEm=document.getElementById('topAvatarEmoji');
+  if(userData.avatar){
+    if(tImg){tImg.src=userData.avatar;tImg.style.display='block';}
+    if(tEm)tEm.style.display='none';
+  }else{
+    if(tImg){tImg.src='';tImg.style.display='none';}
+    if(tEm)tEm.style.display='block';
+  }
+  // Profile big avatar
   const pAv=document.getElementById('profileAvatar');
-  if(pAv)pAv.src=userData.avatar||'';
+  if(pAv){
+    if(userData.avatar){pAv.src=userData.avatar;pAv.style.display='block';}
+    else{pAv.style.display='none';}
+  }
   // Mark chosen preset
   document.querySelectorAll('.av-pick-item').forEach(el=>{
     const src=(el.querySelector('img')?.src||'');
@@ -575,7 +583,7 @@ function buildBotGrid(){
   const g=document.getElementById('botGrid');
   g.innerHTML=BOTS.map((b,i)=>`
     <div class="bot-card" data-i="${i}" onclick="selectBot(${i},this)">
-      <div class="bot-avatar" style="background:${b.color||'#1a1a28'};font-size:1.6rem">${b.emoji||'🤖'}</div>
+      <div class="bot-avatar">${b.img?`<img src="${b.img}" draggable="false" onerror="this.style.display='none';this.parentNode.textContent='🤖'">`:(b.emoji||'🤖')}</div>
       <div class="bot-info"><div class="bot-name">${b.name}</div><div class="bot-elo">${b.elo} ELO</div></div>
     </div>`).join('');
 }
@@ -668,12 +676,11 @@ window.pickAvatar=async function(url,el){
   el.classList.add('chosen');
   await updateDoc(doc(db,'users',currentUser.uid),{avatar:url});
   userData.avatar=url;
-  const pAv=document.getElementById('profileAvatar');
-  if(pAv)pAv.src=url;
-  // Update topbar
-  const tAw=document.getElementById('topAvatar');
-  if(tAw){const tImg=tAw.querySelector('img'),tEm=tAw.querySelector('span');
-    if(tImg){tImg.src=url;tImg.style.display='block';if(tEm)tEm.style.display='none';}}
+  const pAv2=document.getElementById('profileAvatar');
+  if(pAv2){pAv2.src=url;pAv2.style.display='block';}
+  const tImg2=document.getElementById('topAvatarImg'),tEm2=document.getElementById('topAvatarEmoji');
+  if(tImg2){tImg2.src=url;tImg2.style.display='block';}
+  if(tEm2)tEm2.style.display='none';
 };
 
 // Logout / Delete
@@ -740,6 +747,18 @@ window.viewFriendProfile=async function(uid){
   openModal('friendProfileModal');
 };
 
+// Delete friend – removes from both sides
+window.deleteFriend=async function(uid,name){
+  if(!confirm(`Remove ${name} from friends?`))return;
+  await updateDoc(doc(db,'users',currentUser.uid),{friends:arrayRemove(uid)});
+  await updateDoc(doc(db,'users',uid),{friends:arrayRemove(currentUser.uid)});
+  userData.friends=(userData.friends||[]).filter(f=>f!==uid);
+  loadFriends();
+  // reload inbox if open
+  const inbox=document.getElementById('inboxModal');
+  if(inbox&&inbox.classList.contains('show'))loadInbox();
+};
+
 // Friends list
 async function loadFriends(){
   const friends=userData.friends||[];
@@ -758,12 +777,34 @@ async function loadFriends(){
       <div class="friend-actions">
         <button class="sm-btn outline" onclick="viewFriendProfile('${uid}')">Profile</button>
         <button class="sm-btn gold" onclick="openChat('${uid}','${u.username}')">💬</button>
+        <button class="sm-btn danger" onclick="deleteFriend('${uid}','${u.username}')">🗑</button>
       </div>`;
     fl.appendChild(div);
   }
 }
 
 // Inbox
+function setupUpdateListener(){
+  onSnapshot(doc(db,'config','update'),snap=>{
+    if(!snap.exists())return;
+    const hasUpdate=snap.data().available;
+    // Update the modal box if open
+    const box=document.getElementById('updateBox');
+    if(box&&box.dataset.loaded){
+      box.innerHTML=hasUpdate?
+        `<p style="color:var(--text);margin-bottom:16px;font-family:'Cinzel',serif">There is a new version!</p><button class="update-btn available" onclick="doUpdate()">Update Now</button>`:
+        `<p style="color:var(--muted);margin-bottom:16px;font-style:italic">You are up to date</p><button class="update-btn current" disabled>Up To Date</button>`;
+    }
+    // Show notification badge on Update nav item if update available
+    const navUpdate=document.getElementById('updateNavItem');
+    if(navUpdate){
+      const badge=navUpdate.querySelector('.nav-badge');
+      if(hasUpdate){if(!badge){const b=document.createElement('span');b.className='nav-badge';b.textContent='NEW';navUpdate.appendChild(b);}}
+      else{if(badge)badge.remove();}
+    }
+  });
+}
+
 function setupInboxListener(){
   onSnapshot(doc(db,'users',currentUser.uid),snap=>{
     if(!snap.exists())return;
@@ -779,6 +820,10 @@ function setupInboxListener(){
     if(tAw){const tImg=tAw.querySelector('img'),tEm=tAw.querySelector('span');
       if(userData.avatar&&tImg){tImg.src=userData.avatar;tImg.style.display='block';if(tEm)tEm.style.display='none';}
       else{if(tImg)tImg.style.display='none';if(tEm)tEm.style.display='block';}}
+    // Sync topbar avatar from listener
+    const lImg=document.getElementById('topAvatarImg'),lEm=document.getElementById('topAvatarEmoji');
+    if(userData.avatar){if(lImg){lImg.src=userData.avatar;lImg.style.display='block';}if(lEm)lEm.style.display='none';}
+    else{if(lImg){lImg.src='';lImg.style.display='none';}if(lEm)lEm.style.display='block';}
     if(userData.banned){document.getElementById('bannedScreen').style.display='flex';}
   });
 }
@@ -811,6 +856,7 @@ window.loadInbox=async function(){
       <div class="friend-actions">
         <button class="sm-btn outline" onclick="viewFriendProfile('${uid}')">Profile</button>
         <button class="sm-btn gold" onclick="openChat('${uid}','${u.username}')">💬</button>
+        <button class="sm-btn danger" onclick="deleteFriend('${uid}','${u.username}')">🗑</button>
       </div></div>`;
   }
   body.innerHTML=html||'<div class="empty-state">Empty</div>';
@@ -874,13 +920,21 @@ window.toggleEmoji=function(){
 
 // Update
 window.loadUpdate=async function(){
+  const box=document.getElementById('updateBox');
+  box.dataset.loaded='1';
   const snap=await getDoc(doc(db,'config','update'));
   const hasUpdate=snap.exists()&&snap.data().available;
-  document.getElementById('updateBox').innerHTML=hasUpdate?
-    `<p style="color:var(--text);margin-bottom:16px;font-family:'Cinzel',serif">There is a new version!</p><button class="update-btn available" onclick="doUpdate()">Update</button>`:
-    `<p style="color:var(--muted);margin-bottom:16px;font-style:italic">You are up to date</p><button class="update-btn current" disabled>Update</button>`;
+  box.innerHTML=hasUpdate?
+    `<p style="color:var(--text);margin-bottom:16px;font-family:'Cinzel',serif">There is a new version!</p><button class="update-btn available" onclick="doUpdate()">Update Now</button>`:
+    `<p style="color:var(--muted);margin-bottom:16px;font-style:italic">You are up to date</p><button class="update-btn current" disabled>Up To Date</button>`;
 };
-window.doUpdate=function(){location.reload(true)};
+window.doUpdate=async function(){
+  // Mark as seen then reload — after reload config will still say available
+  // but we reload with force cache clear
+  const box=document.getElementById('updateBox');
+  box.innerHTML=`<p style="color:var(--muted);font-style:italic">Updating...</p>`;
+  setTimeout(()=>location.reload(true),400);
+};
 
 // Admin
 window.addAdmin=async function(){
