@@ -114,7 +114,7 @@ let cu=null,ud=null,bot=null;
 let B=new Array(64).fill(null),sel=-1,mvs=[],lastMv=null;
 let turn='white',cas='KQkq',enp='-',over=false,hist=[],pending=null;
 // Stockfish
-let SF=null,sfReady=false,sfCb=null;
+let SF=null,sfReady=false,sfCb=null,sfGeneration=0;
 async function initSF(){
   try{
     const res=await fetch('https://cdn.jsdelivr.net/npm/stockfish@10.0.2/src/stockfish.js');
@@ -123,12 +123,22 @@ async function initSF(){
     SF=new Worker(URL.createObjectURL(blob));
     SF.onmessage=ev=>{
       const s=typeof ev==='string'?ev:ev.data;
-      if(s==='uciok'){SF.postMessage('setoption name Skill Level value '+skill());SF.postMessage('isready');}
+      if(s==='uciok'){
+        SF.postMessage('setoption name Skill Level value '+skill());
+        SF.postMessage('setoption name UCI_LimitStrength value true');
+        SF.postMessage('setoption name UCI_Elo value '+Math.max(1320,Math.min(2850,bot?.elo||1200)));
+        SF.postMessage('isready');
+      }
       if(s==='readyok'){sfReady=true;document.getElementById('thinkLbl').textContent='Thinking...';}
       if(s.startsWith('bestmove')){
-        const mv=s.split(' ')[1];hideThink();
-        if(mv&&mv!=='(none)'&&sfCb){const cb=sfCb;sfCb=null;cb(mv);}
-        else sfCb=null;
+        const mv=s.split(' ')[1];
+        if(_sfWatchdog){clearTimeout(_sfWatchdog);_sfWatchdog=null;}
+        hideThink();
+        if(sfCb){
+          const cb=sfCb;sfCb=null;
+          if(mv&&mv!=='(none)')cb(mv);
+          else doFallbackBot();
+        }
       }
     };
     SF.onerror=()=>{SF=null;sfReady=false;};
@@ -138,17 +148,46 @@ async function initSF(){
 function skill(){const e=bot?.elo||1200;if(e>=2850)return 20;if(e>=2700)return 19;if(e>=2500)return 17;if(e>=2300)return 15;if(e>=2100)return 13;if(e>=1900)return 11;if(e>=1700)return 9;if(e>=1500)return 7;if(e>=1300)return 5;if(e>=1100)return 3;return 1;}
 function mtime(){const e=bot?.elo||1200;if(e>=2700)return 2500;if(e>=2300)return 1500;if(e>=2000)return 1000;if(e>=1700)return 600;if(e>=1400)return 350;return 150;}
 function sdepth(){const e=bot?.elo||1200;if(e>=2700)return 18;if(e>=2300)return 14;if(e>=2000)return 11;if(e>=1700)return 8;if(e>=1400)return 6;return 4;}
+function doFallbackBot(){
+  // Minimax fallback – captures current board state safely
+  hideThink();
+  setTimeout(()=>{
+    if(over||turn!=='black')return;
+    const d=bot.elo>=2000?4:bot.elo>=1500?3:2;
+    const sb=B.map(x=>x?{...x}:null),se=enp,sc=cas,st=turn;
+    const m=minimax(d,false,-Infinity,Infinity);
+    B=sb;enp=se;cas=sc;turn=st;
+    if(m&&m.from!==undefined){
+      const fAlg='abcdefgh'[m.from%8]+(8-~~(m.from/8));
+      const tAlg='abcdefgh'[m.to%8]+(8-~~(m.to/8));
+      const mv=fAlg+tAlg+(m.promo?m.promo.toLowerCase():'');
+      const f=sqI(mv.slice(0,2)),t=sqI(mv.slice(2,4)),pr2=mv[4]?mv[4].toUpperCase():null;
+      if(!over&&turn==='black')execMove(f,t,pr2);
+    }
+  },50);
+}
+
+let _sfWatchdog=null;
 function askSF(fen,cb){
+  // Cancel any pending watchdog
+  if(_sfWatchdog){clearTimeout(_sfWatchdog);_sfWatchdog=null;}
+  
   if(!SF||!sfReady){
-    setTimeout(()=>{
-      const d=bot.elo>=2000?4:bot.elo>=1500?3:2;
-      const sb=B.map(x=>x?{...x}:null),se=enp,sc=cas,st=turn;
-      const m=minimax(d,false,-Infinity,Infinity);
-      B=sb;enp=se;cas=sc;turn=st;hideThink();
-      if(m&&m.from!==undefined)cb('abcdefgh'[m.from%8]+(8-~~(m.from/8))+'abcdefgh'[m.to%8]+(8-~~(m.to/8))+(m.promo?m.promo.toLowerCase():''));
-    },50);return;
+    doFallbackBot();return;
   }
-  sfCb=cb;SF.postMessage('position fen '+fen);SF.postMessage('go depth '+sdepth()+' movetime '+mtime());
+  sfCb=cb;
+  SF.postMessage('position fen '+fen);
+  SF.postMessage('go depth '+sdepth()+' movetime '+mtime());
+  
+  // Watchdog: if no response in movetime+3s, use fallback
+  const watchMs=mtime()+3000;
+  _sfWatchdog=setTimeout(()=>{
+    if(sfCb){
+      console.warn('SF watchdog triggered');
+      sfCb=null;
+      doFallbackBot();
+    }
+  },watchMs);
 }
 // Auth
 onAuthStateChanged(auth,async u=>{
@@ -169,8 +208,18 @@ function setupUI(){
 }
 function showThink(){document.getElementById('think').classList.add('on');if(!sfReady)document.getElementById('thinkLbl').textContent='Loading engine...';}
 function hideThink(){document.getElementById('think').classList.remove('on');}
-window.newGame=function(){if(SF){SF.postMessage('stop');SF.postMessage('ucinewgame');}sfCb=null;hideThink();endDrag();loadFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');sel=-1;mvs=[];lastMv=null;over=false;hist=[];pending=null;render();};
-window.resignGame=function(){if(over)return;if(SF)SF.postMessage('stop');sfCb=null;hideThink();over=true;gameEnd('resignation','black');};
+window.newGame=function(){
+  if(_sfWatchdog){clearTimeout(_sfWatchdog);_sfWatchdog=null;}
+  sfCb=null;
+  if(SF){SF.postMessage('stop');SF.postMessage('ucinewgame');}
+  hideThink();endDrag();loadFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');sel=-1;mvs=[];lastMv=null;over=false;hist=[];pending=null;render();};
+window.resignGame=function(){
+  if(over)return;
+  if(_sfWatchdog){clearTimeout(_sfWatchdog);_sfWatchdog=null;}
+  sfCb=null;
+  if(SF)SF.postMessage('stop');
+  hideThink();over=true;gameEnd('resignation','black');
+};
 function loadFen(fen){B=new Array(64).fill(null);let i=0;for(const ch of fen.split(' ')[0]){if(ch==='/')continue;if(ch>='1'&&ch<='8')i+=+ch;else B[i++]={c:ch===ch.toUpperCase()?'w':'b',t:ch.toUpperCase()};}turn=fen.split(' ')[1]==='w'?'white':'black';cas=fen.split(' ')[2]||'-';enp=fen.split(' ')[3]||'-';}
 function toFen(){let rows=[];for(let r=0;r<8;r++){let row='',e=0;for(let c=0;c<8;c++){const p=B[r*8+c];if(!p)e++;else{if(e){row+=e;e=0;}row+=p.c==='w'?p.t:p.t.toLowerCase();}}if(e)row+=e;rows.push(row);}return rows.join('/')+` ${turn==='white'?'w':'b'} ${cas||'-'} ${enp||'-'} 0 1`;}
 // Render
@@ -211,7 +260,19 @@ function execMove(from,to,pr){
   if(p.t==='P'&&(to<8||to>=56)&&!pr){pending={from,to};showPromo(p.c);return;}
   applyMove(from,to,pr);
   turn=p.c==='w'?'black':'white';lastMv={from,to};hist.push(toFen());sel=-1;mvs=[];render();checkEnd();
-  if(!over&&turn==='black'){showThink();setTimeout(()=>{askSF(toFen(),mv=>{if(!over&&turn==='black'){const f=sqI(mv.slice(0,2)),t=sqI(mv.slice(2,4)),pr2=mv[4]?mv[4].toUpperCase():null;execMove(f,t,pr2);}});},150);}
+  if(!over&&turn==='black'){
+    showThink();
+    const fenForBot=toFen();
+    setTimeout(()=>{
+      if(over||turn!=='black'){hideThink();return;}
+      askSF(fenForBot,mv=>{
+        if(over||turn!=='black'){hideThink();return;}
+        const f=sqI(mv.slice(0,2)),t=sqI(mv.slice(2,4)),pr2=mv[4]?mv[4].toUpperCase():null;
+        if(f>=0&&f<64&&t>=0&&t<64)execMove(f,t,pr2);
+        else doFallbackBot();
+      });
+    },150);
+  }
 }
 function applyMove(from,to,pr){
   const p=B[from],nb=[...B];let nc=cas,ne='-';
