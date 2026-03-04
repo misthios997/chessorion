@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
 <title>ChessOrion</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
 <style>
@@ -162,6 +165,8 @@ main{padding-top:56px;min-height:100vh;position:relative;z-index:1}
 /* Topbar avatar wrapper */
 .avatar-sm{width:34px;height:34px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:1rem;flex-shrink:0}
 .avatar-sm img{width:100%;height:100%;object-fit:cover;pointer-events:none;border-radius:50%}
+/* Force no-referrer on all images (fixes ibb.co hotlink) */
+img{referrer-policy:no-referrer}
 /* Mobile support */
 *{-webkit-tap-highlight-color:transparent}
 input,select,textarea{font-size:16px!important}
@@ -326,12 +331,12 @@ input,select,textarea{font-size:16px!important}
       <img class="avatar-big" id="profileAvatar" src="" alt="avatar" style="cursor:default;font-size:2rem;display:flex;align-items:center;justify-content:center">
       <div style="font-family:'Cinzel',serif;font-size:.74rem;color:var(--muted);letter-spacing:.12em;text-align:center;margin:8px 0 10px">CHOOSE AVATAR</div>
       <div class="av-pick-grid">
-        <div class="av-pick-item" id="avOpt1" onclick="pickAvatar('https://i.ibb.co/Fb6FJQ9g/54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg',this)">
-          <img src="https://i.ibb.co/Fb6FJQ9g/54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg" draggable="false" alt="Avatar 1">
+        <div class="av-pick-item" id="avOpt1" onclick="pickAvatar('https://wsrv.nl/?url=i.ibb.co/Fb6FJQ9g/54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg&w=150&h=150&fit=cover',this)">
+          <img src="https://wsrv.nl/?url=i.ibb.co/Fb6FJQ9g/54b19ada-d53e-4ee9-8882-9dfed1bf1396.jpg&w=150&h=150&fit=cover" referrerpolicy="no-referrer" draggable="false" alt="Avatar 1" onerror="this.src='';this.style.background='#2a2a3a';this.alt='Avatar 1'">
           <div class="av-pick-lbl">Avatar 1</div>
         </div>
-        <div class="av-pick-item" id="avOpt2" onclick="pickAvatar('https://i.ibb.co/jZhYZky2/68f9ebed-9db3-458f-aa15-b5b6dfc8566c.jpg',this)">
-          <img src="https://i.ibb.co/jZhYZky2/68f9ebed-9db3-458f-aa15-b5b6dfc8566c.jpg" draggable="false" alt="Avatar 2">
+        <div class="av-pick-item" id="avOpt2" onclick="pickAvatar('https://wsrv.nl/?url=i.ibb.co/jZhYZky2/68f9ebed-9db3-458f-aa15-b5b6dfc8566c.jpg&w=150&h=150&fit=cover',this)">
+          <img src="https://wsrv.nl/?url=i.ibb.co/jZhYZky2/68f9ebed-9db3-458f-aa15-b5b6dfc8566c.jpg&w=150&h=150&fit=cover" referrerpolicy="no-referrer" draggable="false" alt="Avatar 2" onerror="this.src='';this.style.background='#2a2a3a';this.alt='Avatar 2'">
           <div class="av-pick-lbl">Avatar 2</div>
         </div>
       </div>
@@ -449,20 +454,9 @@ input,select,textarea{font-size:16px!important}
   </div>
   <div class="modal-body">
     <div class="admin-section">
-      <div class="admin-title">Add Admin</div>
+      <div class="admin-title">&#128308; Trigger Update for All Players</div>
       <div class="admin-row">
-        <input class="inp" id="adminAddUser" placeholder="Username">
-        <button class="btn btn-gold" onclick="addAdmin()">Add!</button>
-      </div>
-    </div>
-    <div class="admin-section">
-      <div class="admin-title">Set Update Status</div>
-      <div class="admin-row">
-        <select class="inp" id="updateStatusSel">
-          <option value="false">No update</option>
-          <option value="true">Update available</option>
-        </select>
-        <button class="btn btn-gold" onclick="setUpdateStatus()">SET</button>
+        <button class="btn btn-gold" style="flex:1" onclick="triggerUpdate()">Trigger Update Now</button>
       </div>
     </div>
     <div class="admin-section">
@@ -513,10 +507,10 @@ let currentUser=null, userData=null, selectedTime=null, selectedBot=null, search
 
 // Bots config
 const BOTS=[
-  {name:'Pieter',elo:1250,img:'https://i.ibb.co/Wv34J1qd/1771424229420.png'},
-  {name:'Maria',elo:1600,img:'https://i.ibb.co/WvqDx4nn/1771422684683.png'},
-  {name:'Hikaru',elo:2840,img:'https://i.ibb.co/HvvdN1n/1771421778737.png'},
-  {name:'Magnus',elo:2882,img:'https://i.ibb.co/Q3DM9Vhr/1771421721788.png'},
+  {name:'Pieter',elo:1250,img:'https://wsrv.nl/?url=i.ibb.co/Wv34J1qd/1771424229420.png&w=150&h=150&fit=cover'},
+  {name:'Maria',elo:1600,img:'https://wsrv.nl/?url=i.ibb.co/WvqDx4nn/1771422684683.png&w=150&h=150&fit=cover'},
+  {name:'Hikaru',elo:2840,img:'https://wsrv.nl/?url=i.ibb.co/HvvdN1n/1771421778737.png&w=150&h=150&fit=cover'},
+  {name:'Magnus',elo:2882,img:'https://wsrv.nl/?url=i.ibb.co/Q3DM9Vhr/1771421721788.png&w=150&h=150&fit=cover'},
   {name:'Engine',elo:3200,emoji:'💿'},
 ];
 
@@ -540,7 +534,6 @@ async function loadUserData(){
 
 function updateUI(){
   document.getElementById('topElo').textContent=userData.elo||500;
-  document.getElementById('topAvatar').src=userData.avatar||'';
   document.getElementById('profileUsername').textContent=userData.username;
   document.getElementById('profileId').textContent='ID: '+userData.playerId;
   document.getElementById('profileElo').textContent=userData.elo||500;
@@ -551,7 +544,7 @@ function updateUI(){
   // Update topbar avatar
   const tImg=document.getElementById('topAvatarImg'),tEm=document.getElementById('topAvatarEmoji');
   if(userData.avatar){
-    if(tImg){tImg.src=userData.avatar;tImg.style.display='block';}
+    if(tImg){tImg.src=userData.avatar;tImg.referrerPolicy='no-referrer';tImg.style.display='block';}
     if(tEm)tEm.style.display='none';
   }else{
     if(tImg){tImg.src='';tImg.style.display='none';}
@@ -583,7 +576,9 @@ function buildBotGrid(){
   const g=document.getElementById('botGrid');
   g.innerHTML=BOTS.map((b,i)=>`
     <div class="bot-card" data-i="${i}" onclick="selectBot(${i},this)">
-      <div class="bot-avatar">${b.img?`<img src="${b.img}" draggable="false" onerror="this.style.display='none';this.parentNode.textContent='🤖'">`:(b.emoji||'🤖')}</div>
+      <div class="bot-avatar">${b.img
+        ?`<img src="${b.img}" referrerpolicy="no-referrer" crossorigin="anonymous" draggable="false" onerror="this.outerHTML='<span style=font-size:1.6rem>${b.name[0]}</span>'">`
+        :(b.emoji||'🤖')}</div>
       <div class="bot-info"><div class="bot-name">${b.name}</div><div class="bot-elo">${b.elo} ELO</div></div>
     </div>`).join('');
 }
@@ -679,7 +674,7 @@ window.pickAvatar=async function(url,el){
   const pAv2=document.getElementById('profileAvatar');
   if(pAv2){pAv2.src=url;pAv2.style.display='block';}
   const tImg2=document.getElementById('topAvatarImg'),tEm2=document.getElementById('topAvatarEmoji');
-  if(tImg2){tImg2.src=url;tImg2.style.display='block';}
+  if(tImg2){tImg2.src=url;tImg2.referrerPolicy='no-referrer';tImg2.style.display='block';}
   if(tEm2)tEm2.style.display='none';
 };
 
@@ -719,7 +714,7 @@ async function showFriendResult(uid){
   const isFriend=(userData.friends||[]).includes(uid);
   document.getElementById('friendSearchResult').innerHTML=`
     <div class="friend-card">
-      <div class="friend-av">${u.avatar?`<img src="${u.avatar}" draggable="false">`:'👤'}</div>
+      <div class="friend-av">${u.avatar?`<img src="${u.avatar}" referrerpolicy="no-referrer" draggable="false">`:'👤'}</div>
       <div style="flex:1"><div class="friend-name">${u.username}</div><div class="friend-elo">${u.elo} ELO</div></div>
       <div class="friend-actions">
         <button class="sm-btn outline" onclick="viewFriendProfile('${uid}')">Profile</button>
@@ -772,7 +767,7 @@ async function loadFriends(){
     const div=document.createElement('div');
     div.className='friend-card';
     div.innerHTML=`
-      <div class="friend-av">${u.avatar?`<img src="${u.avatar}" draggable="false">`:'👤'}</div>
+      <div class="friend-av">${u.avatar?`<img src="${u.avatar}" referrerpolicy="no-referrer" draggable="false">`:'👤'}</div>
       <div style="flex:1"><div class="friend-name">${u.username}</div><div class="friend-elo">${u.elo||500} ELO</div></div>
       <div class="friend-actions">
         <button class="sm-btn outline" onclick="viewFriendProfile('${uid}')">Profile</button>
@@ -787,15 +782,16 @@ async function loadFriends(){
 function setupUpdateListener(){
   onSnapshot(doc(db,'config','update'),snap=>{
     if(!snap.exists())return;
-    const hasUpdate=snap.data().available;
-    // Update the modal box if open
+    const serverTrig=snap.data().trigger||0;
+    const seenTrig=parseInt(localStorage.getItem('co_trig')||'0');
+    const hasUpdate=serverTrig>seenTrig;
     const box=document.getElementById('updateBox');
-    if(box&&box.dataset.loaded){
-      box.innerHTML=hasUpdate?
-        `<p style="color:var(--text);margin-bottom:16px;font-family:'Cinzel',serif">There is a new version!</p><button class="update-btn available" onclick="doUpdate()">Update Now</button>`:
-        `<p style="color:var(--muted);margin-bottom:16px;font-style:italic">You are up to date</p><button class="update-btn current" disabled>Up To Date</button>`;
+    if(box){
+      box.dataset.loaded='1';
+      box.innerHTML=hasUpdate
+        ?`<p style="color:var(--text);margin-bottom:16px;font-family:'Cinzel',serif;font-size:1rem">&#128308; New update available!</p><button class="update-btn available" onclick="doUpdate(${serverTrig})">Update Now</button>`
+        :`<p style="color:var(--muted);margin-bottom:16px;font-style:italic">&#10003; You are up to date</p><button class="update-btn current" disabled>Up To Date</button>`;
     }
-    // Show notification badge on Update nav item if update available
     const navUpdate=document.getElementById('updateNavItem');
     if(navUpdate){
       const badge=navUpdate.querySelector('.nav-badge');
@@ -837,7 +833,7 @@ window.loadInbox=async function(){
   // Friend requests
   for(const r of reqs){
     html+=`<div class="friend-card">
-      <div class="friend-av">${r.fromAvatar?`<img src="${r.fromAvatar}" draggable="false">`:'👤'}</div>
+      <div class="friend-av">${r.fromAvatar?`<img src="${r.fromAvatar}" referrerpolicy="no-referrer" draggable="false">`:'👤'}</div>
       <div style="flex:1"><div class="friend-name">${r.fromName}</div><div class="friend-elo">Friend Request</div></div>
       <div class="friend-actions">
         <button class="sm-btn outline" onclick="viewFriendProfile('${r.from}')">Profile</button>
@@ -851,7 +847,7 @@ window.loadInbox=async function(){
     if(!snap.exists())continue;
     const u=snap.data();
     html+=`<div class="friend-card">
-      <div class="friend-av">${u.avatar?`<img src="${u.avatar}" draggable="false">`:'👤'}</div>
+      <div class="friend-av">${u.avatar?`<img src="${u.avatar}" referrerpolicy="no-referrer" draggable="false">`:'👤'}</div>
       <div style="flex:1"><div class="friend-name">${u.username}</div></div>
       <div class="friend-actions">
         <button class="sm-btn outline" onclick="viewFriendProfile('${uid}')">Profile</button>
@@ -919,21 +915,12 @@ window.toggleEmoji=function(){
 };
 
 // Update
-window.loadUpdate=async function(){
+window.loadUpdate=function(){/* handled by live listener */};
+window.doUpdate=function(trig){
+  localStorage.setItem('co_trig',String(trig||0));
   const box=document.getElementById('updateBox');
-  box.dataset.loaded='1';
-  const snap=await getDoc(doc(db,'config','update'));
-  const hasUpdate=snap.exists()&&snap.data().available;
-  box.innerHTML=hasUpdate?
-    `<p style="color:var(--text);margin-bottom:16px;font-family:'Cinzel',serif">There is a new version!</p><button class="update-btn available" onclick="doUpdate()">Update Now</button>`:
-    `<p style="color:var(--muted);margin-bottom:16px;font-style:italic">You are up to date</p><button class="update-btn current" disabled>Up To Date</button>`;
-};
-window.doUpdate=async function(){
-  // Mark as seen then reload — after reload config will still say available
-  // but we reload with force cache clear
-  const box=document.getElementById('updateBox');
-  box.innerHTML=`<p style="color:var(--muted);font-style:italic">Updating...</p>`;
-  setTimeout(()=>location.reload(true),400);
+  if(box)box.innerHTML=`<p style="color:var(--muted);font-style:italic">Updating...</p>`;
+  setTimeout(()=>location.reload(true),300);
 };
 
 // Admin
@@ -945,10 +932,10 @@ window.addAdmin=async function(){
   await updateDoc(doc(db,'users',snap.data().uid),{isAdmin:true});
   document.getElementById('adminMsg').textContent='Admin added: '+username;
 };
-window.setUpdateStatus=async function(){
-  const val=document.getElementById('updateStatusSel').value==='true';
-  await setDoc(doc(db,'config','update'),{available:val});
-  document.getElementById('adminMsg').textContent='Update status set to: '+val;
+window.triggerUpdate=async function(){
+  const ts=Date.now();
+  await setDoc(doc(db,'config','update'),{trigger:ts});
+  document.getElementById('adminMsg').textContent='Update triggered! All players will see update button.';
 };
 window.setPlayerElo=async function(){
   const username=document.getElementById('adminEloUser').value.trim();
