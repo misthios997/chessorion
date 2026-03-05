@@ -192,6 +192,22 @@ function getTheme(){return localStorage.getItem('co_piece_theme')||'classic';}
 const pu=(c,t)=>{const th=THEMES[getTheme()]||THEMES.classic;return th.fn(c,t);};
 window.closeOv=id=>document.getElementById(id).classList.remove('show');
 
+// ── Sound system ──────────────────────────────────────────────
+const SND={};
+['move','capture','check','end'].forEach(k=>{
+  const a=new Audio({
+    move:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3',
+    capture:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3',
+    check:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-check.mp3',
+    end:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-end.mp3'
+  }[k]);
+  a.preload='auto';SND[k]=a;
+});
+function playSound(type){
+  try{const a=SND[type];if(!a)return;a.currentTime=0;a.play().catch(()=>{});}catch(e){}
+}
+
+
 let cu,ud,gid,gd,mc;
 let B=new Array(64).fill(null),sel=null,vm=[],lm=null;
 let turn='white',cr='KQkq',ep='-',wt=600,bt=600,tint=null,clock='white',posH=[],pend=null;
@@ -223,9 +239,16 @@ function startGame(){
       const fenTurn=gd.fen.split(' ')[1]==='w'?'white':'black';
       if(fenTurn===mc){
         // Opponent just moved — reload full state
+        const prevFen=prev?.fen;
         loadFen(gd.fen);lm=gd.lastMove||null;
         wt=gd.whiteTime;bt=gd.blackTime;clock=gd.turn||'white';
-        sel=null;vm=[];posH.push(gd.fen);render();tickUI();
+        sel=null;vm=[];posH.push(gd.fen);
+        // Sound for opponent's move
+        if(gd.status!=='active')playSound('end');
+        else if(isChk(mc==='white'?'w':'b',B,ep))playSound('check');
+        else if(gd.lastMove&&prevFen){const pB=new Array(64).fill(null);let i=0;for(const ch of prevFen.split(' ')[0]){if(ch==='/')continue;if(ch>='1'&&ch<='8')i+=+ch;else pB[i++]={c:ch===ch.toUpperCase()?'w':'b',t:ch.toUpperCase()};}playSound(pB[gd.lastMove.to]||gd.lastMove.promo?'capture':'move');}
+        else playSound('move');
+        render();tickUI();
       } else {
         // We just moved — only update timer display and opponent's last move highlight
         lm=gd.lastMove||null;
@@ -334,6 +357,7 @@ function tap(idx){
 function move(fr,to,promo){
   const p=B[fr];if(!p)return;
   if(p.t==='P'&&(to<8||to>=56)&&!promo){pend={fr,to};showPromo(p.c);return;}
+  const isCapture=!!B[to]||(p.t==='P'&&to===epIdx(ep));
   const st2=applyToB(fr,to,promo,B,ep,cr);
   B=st2.B;ep=st2.ep;cr=st2.cr.trim();
   const oC=p.c==='w'?'b':'w';turn=oC==='w'?'white':'black';lm={from:fr,to};clock=turn;
@@ -343,6 +367,11 @@ function move(fr,to,promo){
   if(!oMv.length){if(isChk(oC,B,ep)){stat='checkmate';wn=mc;}else stat='stalemate';}
   const curKey=toFen().split(' ').slice(0,4).join(' ');
   if(posH.filter(f=>f.split(' ').slice(0,4).join(' ')===curKey).length>=3)stat='repetition';
+  // Play sound
+  if(stat!=='active')playSound('end');
+  else if(isChk(oC,B,ep))playSound('check');
+  else if(isCapture)playSound('capture');
+  else playSound('move');
   updateDoc(doc(db,'games',gid),{fen:toFen(),turn,lastMove:{from:fr,to},whiteTime:wt,blackTime:bt,status:stat,winner:wn,moves:arrayUnion({from:fr,to,p:p.t,c:p.c,promo:promo||null})});
   sel=null;vm=[];render();
   if(stat!=='active'){clearInterval(tint);showGO(stat,wn);}
