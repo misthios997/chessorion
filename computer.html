@@ -122,110 +122,43 @@ let cu=null,ud=null,bot=null;
 let B=new Array(64).fill(null),sel=-1,mvs=[],lm=null;
 let turn='white',cas='KQkq',enp='-',over=false,hist=[],pend=null;
 
-// ── Stockfish via importScripts worker ────────────────────────
-// We create a worker that loads Stockfish via importScripts (no CORS issue)
-let SF=null,sfOk=false,sfCb=null,sfWd=null;
+// ── Bot engine (pure minimax — reliable on all devices) ─────────
+// Stockfish CDN tidak reliable di mobile, pakai minimax as primary
 
-async function initSF(){
-  try{
-    // fetch→blob: works on all browsers, bypasses CORS/referrer issues
-    const r=await fetch('https://cdn.jsdelivr.net/npm/stockfish@10.0.2/src/stockfish.js');
-    if(!r.ok)throw new Error('fetch fail');
-    const code=await r.text();
-    const blob=new Blob([code],{type:'application/javascript'});
-    SF=new Worker(URL.createObjectURL(blob));
-    SF.onmessage=ev=>{
-      const s=typeof ev.data==='string'?ev.data:'';
-      if(!s)return;
-      if(s==='uciok'){
-        SF.postMessage('setoption name Skill Level value '+sfSkill());
-        SF.postMessage('isready');
-      }
-      if(s==='readyok'){
-        sfOk=true;
-        console.log('Stockfish ready, skill='+sfSkill());
-      }
-      if(s.startsWith('bestmove')){
-        if(sfWd){clearTimeout(sfWd);sfWd=null;}
-        hideThink();
-        const mv=s.split(' ')[1];
-        if(sfCb){const cb=sfCb;sfCb=null;if(mv&&mv!=='(none)')cb(mv);else fallbackBot();}
-      }
-    };
-    SF.onerror=(e)=>{console.warn('SF error',e);SF=null;sfOk=false;};
-    SF.postMessage('uci');
-  }catch(e){
-    console.warn('SF fetch failed:',e);
-    SF=null;
-    // Try alternative CDN
-    try{
-      const r2=await fetch('https://unpkg.com/stockfish@10.0.2/src/stockfish.js');
-      if(!r2.ok)throw 0;
-      const code2=await r2.text();
-      SF=new Worker(URL.createObjectURL(new Blob([code2],{type:'application/javascript'})));
-      SF.onmessage=ev=>{
-        const s=typeof ev.data==='string'?ev.data:'';
-        if(s==='uciok'){SF.postMessage('setoption name Skill Level value '+sfSkill());SF.postMessage('isready');}
-        if(s==='readyok'){sfOk=true;}
-        if(s.startsWith('bestmove')){if(sfWd){clearTimeout(sfWd);sfWd=null;}hideThink();const mv=s.split(' ')[1];if(sfCb){const cb=sfCb;sfCb=null;if(mv&&mv!=='(none)')cb(mv);else fallbackBot();}}
-      };
-      SF.onerror=()=>{SF=null;sfOk=false;};
-      SF.postMessage('uci');
-    }catch(e2){SF=null;}
-  }
-}
-function sfSkill(){const e=bot?.elo||1200;if(e>=2850)return 20;if(e>=2700)return 18;if(e>=2500)return 16;if(e>=2300)return 14;if(e>=2000)return 12;if(e>=1700)return 9;if(e>=1500)return 7;if(e>=1300)return 5;if(e>=1100)return 3;return 1;}
-function sfTime(){const e=bot?.elo||1200;if(e>=2700)return 2500;if(e>=2300)return 1500;if(e>=2000)return 1000;if(e>=1700)return 600;if(e>=1400)return 350;return 150;}
-function sfDepth(){const e=bot?.elo||1200;if(e>=2700)return 18;if(e>=2300)return 14;if(e>=2000)return 11;if(e>=1700)return 8;if(e>=1400)return 6;return 4;}
+// Minimax entry point — async via setTimeout agar tidak block UI
+let _botPending=false;
 
-function thinkSF(fen,cb){
-  if(sfWd){clearTimeout(sfWd);sfWd=null;}
-  if(!SF||!sfOk){
-    // No SF — use minimax directly
-    doMinimax(cb);
-    return;
-  }
-  sfCb=cb;
-  SF.postMessage('position fen '+fen);
-  SF.postMessage('go depth '+sfDepth()+' movetime '+sfTime());
-  // Hard watchdog — if SF doesn't respond, minimax takes over
-  const wdMs=Math.min(sfTime()+3000, 8000);
-  sfWd=setTimeout(()=>{
-    console.warn('SF watchdog triggered, falling back to minimax');
-    sfCb=null;
-    if(SF){SF.postMessage('stop');}
-    doMinimax(cb);
-  },wdMs);
-}
-
-// ── Minimax fallback ──────────────────────────────────────────
-function fallbackBot(){
-  if(over||turn!=='black')return;
-  doMinimax(null);
-}
-
-function doMinimax(sfCbOverride){
-  if(over||turn!=='black'){hideThink();return;}
-  showThink('Calculating...');
-  // Small timeout to let UI update
+function botMove(){
+  if(over||turn!=='black'||_botPending)return;
+  _botPending=true;
+  showThink('Thinking...');
+  // Snapshot current state
+  const snapB=copyB(B),snapE=enp,snapC=cas;
   setTimeout(()=>{
-    if(over||turn!=='black'){hideThink();return;}
-    const depth=bot.elo>=2000?4:bot.elo>=1500?3:2;
-    const snapB=B.map(x=>x?{...x}:null),snapE=enp,snapC=cas,snapT=turn;
-    const best=minimax(depth,false,-Infinity,Infinity);
-    // Restore state (minimax modifies B)
-    B=snapB;enp=snapE;cas=snapC;turn=snapT;
-    hideThink();
-    if(over||turn!=='black')return;
-    if(sfCbOverride&&best&&best.from!==undefined){
-      // Called from SF watchdog with original callback
-      const mv='abcdefgh'[best.from%8]+(8-~~(best.from/8))+'abcdefgh'[best.to%8]+(8-~~(best.to/8))+(best.promo?best.promo.toLowerCase():'');
-      sfCbOverride(mv);
-    } else if(best&&best.from!==undefined){
-      execMove(best.from,best.to,best.promo||null);
+    if(over||turn!=='black'){hideThink();_botPending=false;return;}
+    // Use low depth for fast response; add jitter for low ELO
+    const depth=bot.elo>=2500?4:bot.elo>=1800?3:bot.elo>=1200?2:1;
+    let best=minimax(depth,false,-Infinity,Infinity,snapB,snapE,snapC);
+    // If minimax fails (edge case), pick random legal move
+    if(!best||best.from===undefined){
+      const moves=[];
+      for(let i=0;i<64;i++)if(snapB[i]&&snapB[i].c==='b'){
+        const lm=[];
+        // pseudo moves
+        const ps=pseudo(i,snapB[i],snapB,snapE,snapC);
+        ps.forEach(to=>{const st=applyToB(i,to,null,snapB,snapE,snapC);if(!isChk('b',st.B,st.ep))lm.push(to);});
+        lm.forEach(to=>moves.push({from:i,to}));
+      }
+      if(moves.length)best=moves[~~(Math.random()*moves.length)];
     }
-  },30);
+    hideThink();_botPending=false;
+    if(over||turn!=='black')return;
+    if(best&&best.from!==undefined){
+      execMove(best.from,best.to,null);
+    }
+  },50);
 }
+
 
 // ── Auth ──────────────────────────────────────────────────────
 onAuthStateChanged(auth,async u=>{
@@ -264,23 +197,20 @@ function showThink(msg){
 function hideThink(){document.getElementById('think').classList.remove('on');}
 
 window.newGame=function(){
-  if(sfWd){clearTimeout(sfWd);sfWd=null;}sfCb=null;
-  if(SF){SF.postMessage('stop');SF.postMessage('ucinewgame');}
+  _botPending=false;
   hideThink();endDrag();
   B=new Array(64).fill(null);
   // Load starting position
   const FEN='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   let i=0;for(const ch of FEN.split(' ')[0]){if(ch==='/')continue;if(ch>='1'&&ch<='8')i+=+ch;else B[i++]={c:ch===ch.toUpperCase()?'w':'b',t:ch.toUpperCase()};}
-  turn='white';cas='KQkq';enp='-';sel=-1;mvs=[];lm=null;over=false;hist=[];pend=null;
+  turn='white';cas='KQkq';enp='-';sel=-1;mvs=[];lm=null;over=false;hist=[];pend=null;_botPending=false;
   document.getElementById('goOv').classList.remove('on');
   render();
 };
 
 window.resignGame=function(){
   if(over)return;
-  if(sfWd){clearTimeout(sfWd);sfWd=null;}sfCb=null;
-  if(SF)SF.postMessage('stop');
-  hideThink();over=true;gameEnd('resignation','black');
+  _botPending=false;hideThink();over=true;gameEnd('resignation','black');
 };
 
 // ── FEN ───────────────────────────────────────────────────────
@@ -293,7 +223,7 @@ function toFen(){
 // ── Render ────────────────────────────────────────────────────
 function render(){
   const bd=document.getElementById('board');bd.innerHTML='';
-  const cc=turn==='white'?'w':'b',ck=isChk(cc),ki=B.findIndex(p=>p&&p.t==='K'&&p.c===cc);
+  const cc=turn==='white'?'w':'b',ck=isChk(cc,B,enp),ki=B.findIndex(p=>p&&p.t==='K'&&p.c===cc);
   for(let d=0;d<64;d++){
     const r=~~(d/8),c=d%8,light=(r+c)%2===0;
     const sq=document.createElement('div');
@@ -330,20 +260,7 @@ function execMove(from,to,pr){
   if(p.t==='P'&&(to<8||to>=56)&&!pr){pend={from,to};showPromo(p.c);return;}
   applyMove(from,to,pr);
   turn=p.c==='w'?'black':'white';lm={from,to};hist.push(toFen());sel=-1;mvs=[];render();checkEnd();
-  if(!over&&turn==='black'){
-    showThink(sfOk?'Thinking...':'Calculating...');
-    const fen=toFen();
-    setTimeout(()=>{
-      if(over||turn!=='black'){hideThink();return;}
-      thinkSF(fen,mv=>{
-        if(over||turn!=='black'){hideThink();return;}
-        const f=alg2idx(mv.slice(0,2)),t=alg2idx(mv.slice(2,4));
-        const pr2=mv[4]?mv[4].toUpperCase():null;
-        if(f>=0&&f<64&&t>=0&&t<64)execMove(f,t,pr2);
-        else fallbackBot();
-      });
-    },100);
-  }
+  if(!over&&turn==='black'){botMove();}
 }
 
 function applyMove(from,to,pr){
@@ -358,7 +275,7 @@ function applyMove(from,to,pr){
 
 function checkEnd(){
   const col=turn==='white'?'w':'b',av=allLegal(col);
-  if(!av.length){over=true;isChk(col)?gameEnd('checkmate',turn==='white'?'black':'white'):gameEnd('stalemate',null);return;}
+  if(!av.length){over=true;isChk(col,B,enp)?gameEnd('checkmate',turn==='white'?'black':'white'):gameEnd('stalemate',null);return;}
   const key=toFen().split(' ').slice(0,4).join(' ');
   if(hist.filter(f=>f.split(' ').slice(0,4).join(' ')===key).length>=3){over=true;gameEnd('repetition',null);}
 }
@@ -369,43 +286,75 @@ function showPromo(col){
 }
 window.__pr=type=>{document.getElementById('promoOv').classList.remove('on');if(!pend)return;const{from,to}=pend;pend=null;execMove(from,to,type);};
 
-const alg2idx=a=>(8-+a[1])*8+(a.charCodeAt(0)-97);
-const enp2idx=e=>e==='-'?-1:(8-+e[1])*8+(e.charCodeAt(0)-97);
 
-// ── Move generation ───────────────────────────────────────────
-function pseudo(from,p){
-  const mv=[],r=~~(from/8),c=from%8;
-  const sl=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){const i=nr*8+nc;if(B[i]){if(B[i].c!==p.c)mv.push(i);break;}mv.push(i);nr+=dr;nc+=dc;}};
+// ── Chess engine (fixed deep-copy, no recursive attack) ─────────
+function copyB(b){return b.map(p=>p?{c:p.c,t:p.t}:null);}
+function epIdx(e){return e==='-'?-1:(8-+e[1])*8+(e.charCodeAt(0)-97);}
+
+function isAttB(idx,by,_B,_ep){
+  for(let i=0;i<64;i++){
+    const p=_B[i];if(!p||p.c!==by)continue;
+    const r=~~(i/8),c=i%8;
+    if(p.t==='P'){const d=by==='w'?-1:1;for(const dc of[-1,1]){if(c+dc>=0&&c+dc<=7&&(r+d)*8+c+dc===idx)return true;}continue;}
+    if(p.t==='N'){for(const[dr,dc]of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8&&nr*8+nc===idx)return true;}continue;}
+    if(p.t==='K'){for(const[dr,dc]of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){const nr=r+dr,nc2=c+dc;if(nr>=0&&nr<8&&nc2>=0&&nc2<8&&nr*8+nc2===idx)return true;}continue;}
+    const dirs=p.t==='B'?[[-1,-1],[-1,1],[1,-1],[1,1]]:p.t==='R'?[[-1,0],[1,0],[0,-1],[0,1]]:[[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]];
+    for(const[dr,dc]of dirs){let nr=r+dr,nc2=c+dc;while(nr>=0&&nr<8&&nc2>=0&&nc2<8){const j=nr*8+nc2;if(j===idx)return true;if(_B[j])break;nr+=dr;nc2+=dc;}}
+  }
+  return false;
+}
+function isChk(col,_B,_ep){
+  const ki=_B.findIndex(p=>p&&p.t==='K'&&p.c===col);
+  return ki>=0&&isAttB(ki,col==='w'?'b':'w',_B,_ep);
+}
+function pseudo(fr,p,_B,_ep,_cas){
+  const mv=[],r=~~(fr/8),c=fr%8;
+  const sl=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){const i=nr*8+nc;if(_B[i]){if(_B[i].c!==p.c)mv.push(i);break;}mv.push(i);nr+=dr;nc+=dc;}};
+  const ei=epIdx(_ep);
   switch(p.t){
     case'P':{const d=p.c==='w'?-1:1,s=p.c==='w'?r===6:r===1;
-      if(r+d>=0&&r+d<8&&!B[(r+d)*8+c])mv.push((r+d)*8+c);
-      if(s&&!B[(r+d)*8+c]&&!B[(r+2*d)*8+c])mv.push((r+2*d)*8+c);
-      for(const dc of[-1,1]){if(c+dc>=0&&c+dc<8){const t=B[(r+d)*8+c+dc];if(t&&t.c!==p.c)mv.push((r+d)*8+c+dc);const ei=enp2idx(enp);if(ei===(r+d)*8+c+dc)mv.push(ei);}}break;}
-    case'N':for(const[dr,dc]of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8&&(!B[nr*8+nc]||B[nr*8+nc].c!==p.c))mv.push(nr*8+nc);}break;
+      if(r+d>=0&&r+d<8&&!_B[(r+d)*8+c])mv.push((r+d)*8+c);
+      if(s&&!_B[(r+d)*8+c]&&!_B[(r+2*d)*8+c])mv.push((r+2*d)*8+c);
+      for(const dc of[-1,1]){if(c+dc<0||c+dc>7)continue;const ti=(r+d)*8+c+dc;if(_B[ti]&&_B[ti].c!==p.c)mv.push(ti);else if(ei>=0&&ti===ei)mv.push(ti);}break;}
+    case'N':for(const[dr,dc]of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8&&(!_B[nr*8+nc]||_B[nr*8+nc].c!==p.c))mv.push(nr*8+nc);}break;
     case'B':for(const[dr,dc]of[[-1,-1],[-1,1],[1,-1],[1,1]])sl(dr,dc);break;
     case'R':for(const[dr,dc]of[[-1,0],[1,0],[0,-1],[0,1]])sl(dr,dc);break;
     case'Q':for(const[dr,dc]of[[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]])sl(dr,dc);break;
     case'K':{
-      for(const[dr,dc]of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8&&(!B[nr*8+nc]||B[nr*8+nc].c!==p.c))mv.push(nr*8+nc);}
-      function att(i,by){for(let j=0;j<64;j++)if(B[j]&&B[j].c===by){const tmp=pseudo.tempSkip;if(!tmp){const pm=pseudo(j,B[j]);if(pm.includes(i))return true;}}return false;}
-      if(p.c==='w'&&from===60){if(cas.includes('K')&&!B[61]&&!B[62]&&!isAtt(60,'b')&&!isAtt(61,'b')&&!isAtt(62,'b'))mv.push(62);if(cas.includes('Q')&&!B[59]&&!B[58]&&!B[57]&&!isAtt(60,'b')&&!isAtt(59,'b')&&!isAtt(58,'b'))mv.push(58);}
-      if(p.c==='b'&&from===4){if(cas.includes('k')&&!B[5]&&!B[6]&&!isAtt(4,'w')&&!isAtt(5,'w')&&!isAtt(6,'w'))mv.push(6);if(cas.includes('q')&&!B[3]&&!B[2]&&!B[1]&&!isAtt(4,'w')&&!isAtt(3,'w')&&!isAtt(2,'w'))mv.push(2);}
-      break;}
+      for(const[dr,dc]of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8&&(!_B[nr*8+nc]||_B[nr*8+nc].c!==p.c))mv.push(nr*8+nc);}
+      const opp=p.c==='w'?'b':'w';
+      if(p.c==='w'&&fr===60){
+        if(_cas.includes('K')&&!_B[61]&&!_B[62]&&!isAttB(60,opp,_B,_ep)&&!isAttB(61,opp,_B,_ep)&&!isAttB(62,opp,_B,_ep))mv.push(62);
+        if(_cas.includes('Q')&&!_B[59]&&!_B[58]&&!_B[57]&&!isAttB(60,opp,_B,_ep)&&!isAttB(59,opp,_B,_ep)&&!isAttB(58,opp,_B,_ep))mv.push(58);
+      }
+      if(p.c==='b'&&fr===4){
+        if(_cas.includes('k')&&!_B[5]&&!_B[6]&&!isAttB(4,'w',_B,_ep)&&!isAttB(5,'w',_B,_ep)&&!isAttB(6,'w',_B,_ep))mv.push(6);
+        if(_cas.includes('q')&&!_B[3]&&!_B[2]&&!_B[1]&&!isAttB(4,'w',_B,_ep)&&!isAttB(3,'w',_B,_ep)&&!isAttB(2,'w',_B,_ep))mv.push(2);
+      }break;}
   }
   return mv;
 }
-function isAtt(idx,by){for(let i=0;i<64;i++)if(B[i]&&B[i].c===by&&pseudo(i,B[i]).includes(idx))return true;return false;}
-function isChk(col){const ki=B.findIndex(p=>p&&p.t==='K'&&p.c===col);return ki>=0&&isAtt(ki,col==='w'?'b':'w');}
+function applyToB(fr,to,pr,_B,_ep,_cas){
+  const p=_B[fr],nb=copyB(_B);let nc=_cas,ne='-';
+  const ei=epIdx(_ep);
+  if(p.t==='P'&&to===ei){const d=p.c==='w'?1:-1;nb[to+d*8]=null;}
+  if(p.t==='K'){nc=nc.replace(p.c==='w'?/[KQ]/g:/[kq]/g,'');const df=to-fr;if(Math.abs(df)===2){if(p.c==='w'){if(df===2){nb[63]=null;nb[61]={c:'w',t:'R'};}else{nb[56]=null;nb[59]={c:'w',t:'R'};}}else{if(df===2){nb[7]=null;nb[5]={c:'b',t:'R'};}else{nb[0]=null;nb[3]={c:'b',t:'R'};}}}}
+  if(p.t==='R'){if(fr===63)nc=nc.replace('K','');if(fr===56)nc=nc.replace('Q','');if(fr===7)nc=nc.replace('k','');if(fr===0)nc=nc.replace('q','');}
+  if(p.t==='P'&&Math.abs(to-fr)===16)ne='abcdefgh'[(fr+(to>fr?8:-8))%8]+(8-~~((fr+(to>fr?8:-8))/8));
+  const isP=p.t==='P'&&(to<8||to>=56);
+  nb[to]=isP&&pr?{c:p.c,t:pr.toUpperCase()}:{c:p.c,t:p.t};nb[fr]=null;
+  return{B:nb,ep:ne,cas:nc||'-'};
+}
 function legal(from){
   const p=B[from];if(!p)return[];
-  return pseudo(from,p).filter(to=>{
-    const sb=B.map(x=>x?{...x}:null),se=enp,sc=cas;
-    applyMove(from,to,null);const ok=!isChk(p.c);B=sb;enp=se;cas=sc;return ok;
+  return pseudo(from,p,B,enp,cas).filter(to=>{
+    const st=applyToB(from,to,null,B,enp,cas);
+    return!isChk(p.c,st.B,st.ep);
   });
 }
-function allLegal(col){const r=[];for(let i=0;i<64;i++)if(B[i]&&B[i].c===col)legal(i).forEach(t=>r.push({from:i,to:t}));return r;}
+function allLegal(col){const r=[];for(let i=0;i<64;i++)if(B[i]&&B[i].c===col)legal(i).forEach(t=>r.push({from:i,to:t}));return r;}));return r;}
 
-// ── Minimax ───────────────────────────────────────────────────
+// ── Minimax (explicit state — no global mutation) ────────────────
 const V={P:100,N:320,B:330,R:500,Q:900,K:20000};
 const PST={
   P:[0,0,0,0,0,0,0,0,5,10,10,-20,-20,10,10,5,5,-5,-10,0,0,-10,-5,5,0,0,0,20,20,0,0,0,5,5,10,25,25,10,5,5,10,10,20,30,30,20,10,10,50,50,50,50,50,50,50,50,0,0,0,0,0,0,0,0],
@@ -415,24 +364,28 @@ const PST={
   Q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,5,0,0,0,0,-10,-10,5,5,5,5,5,0,-10,0,0,5,5,5,5,0,-5,-5,0,5,5,5,5,0,-5,-10,0,5,5,5,5,0,-10,-10,0,0,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
   K:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
 };
-function evalB(){let s=0;for(let i=0;i<64;i++){const p=B[i];if(!p)continue;const v=V[p.t]+(PST[p.t]?.[p.c==='w'?i:63-i]||0);s+=p.c==='w'?v:-v;}return s;}
-function mmApply(from,to){
-  const p=B[from],nb=[...B];let nc=cas;
-  if(p.t==='P'&&to===enp2idx(enp)){const d=p.c==='w'?1:-1;nb[to+d*8]=null;}
-  if(p.t==='K'){nc=nc.replace(p.c==='w'?/[KQ]/g:/[kq]/g,'');const df=to-from;if(Math.abs(df)===2){if(df===2){nb[63]=null;nb[61]={c:p.c,t:'R'};}else{nb[56]=null;nb[59]={c:p.c,t:'R'};}}}
-  if(p.t==='R'){if(from===63)nc=nc.replace('K','');if(from===56)nc=nc.replace('Q','');if(from===7)nc=nc.replace('k','');if(from===0)nc=nc.replace('q','');}
-  nb[to]=p;nb[from]=null;B=nb;cas=nc||'-';
+function evalBoard(_B){
+  let s=0;
+  for(let i=0;i<64;i++){const p=_B[i];if(!p)continue;const v=V[p.t]+(PST[p.t]?.[p.c==='w'?i:63-i]||0);s+=p.c==='w'?v:-v;}
+  return s;
 }
-function minimax(depth,isMax,alpha,beta){
-  if(!depth)return{score:evalB()};
-  const col=isMax?'w':'b',moves=allLegal(col);
-  if(!moves.length)return{score:isChk(col)?(isMax?-1e6:1e6):0};
+function minimax(depth,isMax,alpha,beta,_B,_ep,_cas){
+  if(!depth)return{score:evalBoard(_B)};
+  const col=isMax?'w':'b';
+  // get all legal moves for col on _B
+  const moves=[];
+  for(let i=0;i<64;i++){
+    const p=_B[i];if(!p||p.c!==col)continue;
+    pseudo(i,p,_B,_ep,_cas).forEach(to=>{
+      const st=applyToB(i,to,null,_B,_ep,_cas);
+      if(!isChk(col,st.B,st.ep))moves.push({from:i,to});
+    });
+  }
+  if(!moves.length)return{score:isChk(col,_B,_ep)?(isMax?-1e6:1e6):0};
   let best=isMax?{score:-Infinity}:{score:Infinity};
   for(const m of moves){
-    const sb=B.map(x=>x?{...x}:null),se=enp,sc=cas,st=turn;
-    mmApply(m.from,m.to);turn=col==='w'?'black':'white';
-    const r=minimax(depth-1,!isMax,alpha,beta);
-    B=sb;enp=se;cas=sc;turn=st;
+    const st=applyToB(m.from,m.to,null,_B,_ep,_cas);
+    const r=minimax(depth-1,!isMax,alpha,beta,st.B,st.ep,st.cas);
     if(isMax){if(r.score>best.score)best={...m,score:r.score};alpha=Math.max(alpha,r.score);}
     else{if(r.score<best.score)best={...m,score:r.score};beta=Math.min(beta,r.score);}
     if(beta<=alpha)break;
