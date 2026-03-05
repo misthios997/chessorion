@@ -37,7 +37,7 @@ body{font-family:'Crimson Pro',serif;color:var(--tx);display:flex;flex-direction
 .sq.cap.D{background:radial-gradient(var(--ds) 56%,rgba(0,0,0,.3) 56%)!important}
 .sq.chk{background:radial-gradient(ellipse,#ff0000cc,#e0555599 70%)!important}
 .sq.dov.L{background:#baca44bb!important}.sq.dov.D{background:#baca44bb!important}
-.piece{width:100%;height:100%;object-fit:contain;padding:2%;z-index:1;pointer-events:none;-webkit-user-drag:none;touch-action:none}
+.piece{width:88%;height:88%;object-fit:contain;z-index:1;pointer-events:none;-webkit-user-drag:none;touch-action:none;display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
 .coord{position:absolute;font-size:clamp(7px,1.3vw,10px);font-weight:700;font-family:'Cinzel',serif;opacity:.75;pointer-events:none;z-index:3;line-height:1}
 .sq.L .coord{color:var(--ds)}.sq.D .coord{color:var(--ls)}
 .rank{bottom:2px;right:3px}.file{top:2px;left:3px}
@@ -110,9 +110,12 @@ import{getFirestore,doc,getDoc,updateDoc,arrayUnion}from"https://www.gstatic.com
 const app=initializeApp({apiKey:"AIzaSyBDFWnGF4gG7nRrqwGAlxL-EOZiSPXs7kM",authDomain:"chessorion-cb690.firebaseapp.com",projectId:"chessorion-cb690",storageBucket:"chessorion-cb690.firebasestorage.app",messagingSenderId:"936378240439",appId:"1:936378240439:web:7a578803271ea9b7a52c32"});
 const auth=getAuth(app),db=getFirestore(app);
 
-const _W='https://upload.wikimedia.org/wikipedia/commons';
-const PI={wK:_W+'/4/42/Chess_klt45.svg',wQ:_W+'/1/15/Chess_qlt45.svg',wR:_W+'/7/72/Chess_rlt45.svg',wB:_W+'/b/b1/Chess_blt45.svg',wN:_W+'/7/70/Chess_nlt45.svg',wP:_W+'/4/45/Chess_plt45.svg',bK:_W+'/f/f0/Chess_kdt45.svg',bQ:_W+'/4/47/Chess_qdt45.svg',bR:_W+'/f/ff/Chess_rdt45.svg',bB:_W+'/9/98/Chess_bdt45.svg',bN:_W+'/e/ef/Chess_ndt45.svg',bP:_W+'/c/c7/Chess_pdt45.svg'};
-const pu=(c,t)=>PI[c+t];
+const THEMES={
+  classic:{fn:(c,t)=>{const W='https://upload.wikimedia.org/wikipedia/commons';const M={wK:'/4/42/Chess_klt45.svg',wQ:'/1/15/Chess_qlt45.svg',wR:'/7/72/Chess_rlt45.svg',wB:'/b/b1/Chess_blt45.svg',wN:'/7/70/Chess_nlt45.svg',wP:'/4/45/Chess_plt45.svg',bK:'/f/f0/Chess_kdt45.svg',bQ:'/4/47/Chess_qdt45.svg',bR:'/f/ff/Chess_rdt45.svg',bB:'/9/98/Chess_bdt45.svg',bN:'/e/ef/Chess_ndt45.svg',bP:'/c/c7/Chess_pdt45.svg'};return W+(M[c+t]||'');}},
+  wood:{fn:(c,t)=>{const col=c==='w'?'White':'Black';const nm={K:'King',Q:'Queen',R:'Rook',B:'Bishop',N:'Knight',P:'Pawn'};return`https://chessasset.vercel.app/${col}${nm[t]}.png`;}},
+  neo:{fn:(c,t)=>{const BASE='https://images.chesscomfiles.com/chess-themes/pieces/neo/150/';const M={wK:'wk',wQ:'wq',wR:'wr',wB:'wb',wN:'wn',wP:'wp',bK:'bk',bQ:'bq',bR:'br',bB:'bb',bN:'bn',bP:'bp'};return BASE+(M[c+t]||'')+'.png';}}
+};
+const pu=(c,t)=>{const th=THEMES[localStorage.getItem('co_piece_theme')||'classic']||THEMES.classic;return th.fn(c,t);};
 
 // ── State ─────────────────────────────────────────────────────
 let cu=null,ud=null,bot=null;
