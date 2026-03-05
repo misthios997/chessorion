@@ -117,6 +117,21 @@ const THEMES={
 };
 const pu=(c,t)=>{const th=THEMES[localStorage.getItem('co_piece_theme')||'classic']||THEMES.classic;return th.fn(c,t);};
 
+
+// ── Sound system ──────────────────────────────────────────────
+const SND={};
+['move','capture','check','end'].forEach(k=>{
+  const a=new Audio({
+    move:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3',
+    capture:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3',
+    check:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-check.mp3',
+    end:'https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-end.mp3'
+  }[k]);
+  a.preload='auto';SND[k]=a;
+});
+function playSound(type){
+  try{const a=SND[type];if(!a)return;a.currentTime=0;a.play().catch(()=>{});}catch(e){}
+}
 // ── State ─────────────────────────────────────────────────────
 let cu=null,ud=null,bot=null;
 let B=new Array(64).fill(null),sel=-1,mvs=[],lm=null;
@@ -258,19 +273,18 @@ function doTap(idx){if(idx<0||over||turn!=='white')return;const p=B[idx];if(sel=
 function execMove(from,to,pr){
   const p=B[from];if(!p)return;
   if(p.t==='P'&&(to<8||to>=56)&&!pr){pend={from,to};showPromo(p.c);return;}
-  applyMove(from,to,pr);
-  turn=p.c==='w'?'black':'white';lm={from,to};hist.push(toFen());sel=-1;mvs=[];render();checkEnd();
+  // Detect move type for sound BEFORE applying move
+  const isCapture=!!B[to]||(p.t==='P'&&to===epIdx(enp));
+  const st=applyToB(from,to,pr,B,enp,cas);
+  B=st.B;enp=st.ep;cas=st.cas;
+  turn=p.c==='w'?'black':'white';lm={from,to};hist.push(toFen());sel=-1;mvs=[];
+  // Sound
+  const opp=p.c==='w'?'b':'w';
+  if(isChk(opp,B,enp))playSound('check');
+  else if(isCapture)playSound('capture');
+  else playSound('move');
+  render();checkEnd();
   if(!over&&turn==='black'){botMove();}
-}
-
-function applyMove(from,to,pr){
-  const p=B[from],nb=[...B];let nc=cas,ne='-';
-  if(p.t==='P'&&to===enp2idx(enp)){const d=p.c==='w'?1:-1;nb[to+d*8]=null;}
-  if(p.t==='K'){nc=nc.replace(p.c==='w'?/[KQ]/g:/[kq]/g,'');const df=to-from;if(Math.abs(df)===2){if(df===2){nb[63]=null;nb[61]={c:p.c,t:'R'};}else{nb[56]=null;nb[59]={c:p.c,t:'R'};}}}
-  if(p.t==='R'){if(from===63)nc=nc.replace('K','');if(from===56)nc=nc.replace('Q','');if(from===7)nc=nc.replace('k','');if(from===0)nc=nc.replace('q','');}
-  if(p.t==='P'&&Math.abs(to-from)===16)ne='abcdefgh'[(from+(to>from?8:-8))%8]+(8-~~((from+(to>from?8:-8))/8));
-  const isP=p.t==='P'&&(to<8||to>=56);
-  nb[to]=isP&&pr?{c:p.c,t:pr.toUpperCase()}:p;nb[from]=null;B=nb;cas=nc||'-';enp=ne;
 }
 
 function checkEnd(){
@@ -287,7 +301,7 @@ function showPromo(col){
 window.__pr=type=>{document.getElementById('promoOv').classList.remove('on');if(!pend)return;const{from,to}=pend;pend=null;execMove(from,to,type);};
 
 
-// ── Chess engine (fixed deep-copy, no recursive attack) ─────────
+// ── Chess engine ─────────────────────────────────────────────
 function copyB(b){return b.map(p=>p?{c:p.c,t:p.t}:null);}
 function epIdx(e){return e==='-'?-1:(8-+e[1])*8+(e.charCodeAt(0)-97);}
 
@@ -394,7 +408,7 @@ function minimax(depth,isMax,alpha,beta,_B,_ep,_cas){
 }
 
 // ── Game end ──────────────────────────────────────────────────
-function gameEnd(st,wn){
+function gameEnd(st,wn){playSound('end');
   hideThink();
   const T={checkmate:wn==='white'?'You Win! \u{1F3C6}':'You Lose \u{1F621}',stalemate:'Draw',repetition:'Draw',resignation:'You Lose'};
   const D={checkmate:'By Checkmate',stalemate:'By Stalemate',repetition:'By Repetition',resignation:'By Resignation'};
