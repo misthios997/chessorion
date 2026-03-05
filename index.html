@@ -149,6 +149,15 @@ main{padding-top:56px;min-height:100vh;position:relative;z-index:1}
 #bannedScreen{position:fixed;inset:0;background:var(--dark);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
 #bannedScreen h1{font-family:'Cinzel',serif;font-size:3rem;color:var(--error)}
 #bannedScreen p{color:var(--muted);font-style:italic}
+
+/* Settings / Theme */
+.theme-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:4px}
+.theme-card{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel2);border:2px solid var(--border);border-radius:12px;cursor:pointer;touch-action:manipulation;transition:.15s}
+.theme-card:active,.theme-card.active{border-color:var(--gold);background:#c9a84c14}
+.theme-prev{width:56px;height:56px;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;background:var(--panel2);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.theme-prev img{width:100%;height:100%;object-fit:contain;padding:2px}
+.theme-label{font-family:'Cinzel',serif;font-size:.88rem;color:var(--text)}
+.theme-desc{font-size:.76rem;color:var(--muted);margin-top:2px}
 /* empty state */
 .empty-state{color:var(--muted);text-align:center;font-style:italic;padding:24px}
 /* scrollbar */
@@ -237,6 +246,7 @@ input,select,textarea{font-size:16px!important}
   <div class="nav-item" onclick="openModal('inboxModal')"><span class="ico">📬</span> Inbox <span class="nav-badge" id="inboxBadge" style="display:none">0</span></div>
   <div class="nav-item" onclick="openModal('friendsModal')"><span class="ico">➕</span> Add Friend</div>
   <div class="nav-item" id="updateNavItem" onclick="openModal('updateModal')"><span class="ico">🔄</span> Update</div>
+  <div class="nav-item" onclick="openModal('settingsModal')"><span class="ico">⚙️</span> Settings</div>
   <div class="nav-item" id="adminNavItem" style="display:none" onclick="openModal('adminModal')"><span class="ico">⚙️</span> Admin Panel</div>
 </div>
 
@@ -427,6 +437,33 @@ input,select,textarea{font-size:16px!important}
     </div>
     <div id="emojiPicker" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:1.4rem">
       😊😂❤️👍🔥♟️👑🎉😤😢🤝✌️💪🧠⚡🏆😈👀🤔💀
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Settings -->
+<div class="overlay" id="settingsModal" onclick="closeOnBg(event,'settingsModal')">
+<div class="modal">
+  <div class="modal-header">
+    <span class="modal-title">⚙️ Settings</span>
+    <button class="close-btn" onclick="closeModal('settingsModal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="section-title" style="margin-bottom:12px">🎨 Piece Theme</div>
+    <div class="theme-grid" id="themeGridIndex">
+      <div class="theme-card" data-theme="classic" onclick="pickTheme('classic',this)">
+        <div class="theme-prev" id="idx-prev-classic"></div>
+        <div><div class="theme-label">Classic</div><div class="theme-desc">Wikipedia SVG pieces</div></div>
+      </div>
+      <div class="theme-card" data-theme="wood" onclick="pickTheme('wood',this)">
+        <div class="theme-prev" id="idx-prev-wood"></div>
+        <div><div class="theme-label">Wood</div><div class="theme-desc">Carved wood style</div></div>
+      </div>
+      <div class="theme-card" data-theme="neo" onclick="pickTheme('neo',this)">
+        <div class="theme-prev" id="idx-prev-neo"></div>
+        <div><div class="theme-label">Neo</div><div class="theme-desc">Chess.com Neo style</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -963,6 +1000,30 @@ window.unbanPlayer=async function(){
   document.getElementById('adminMsg').textContent='Unbanned: '+username;
 };
 
+// ── Piece theme system ────────────────────────────────────────
+const IDX_THEMES={
+  classic:{fn:(c,t)=>{const W='https://upload.wikimedia.org/wikipedia/commons';const M={wK:'/4/42/Chess_klt45.svg',wQ:'/1/15/Chess_qlt45.svg',wR:'/7/72/Chess_rlt45.svg',wB:'/b/b1/Chess_blt45.svg',wN:'/7/70/Chess_nlt45.svg',wP:'/4/45/Chess_plt45.svg',bK:'/f/f0/Chess_kdt45.svg',bQ:'/4/47/Chess_qdt45.svg',bR:'/f/ff/Chess_rdt45.svg',bB:'/9/98/Chess_bdt45.svg',bN:'/e/ef/Chess_ndt45.svg',bP:'/c/c7/Chess_pdt45.svg'};return W+(M[c+t]||'');}},
+  wood:{fn:(c,t)=>{const col=c==='w'?'White':'Black';const nm={K:'King',Q:'Queen',R:'Rook',B:'Bishop',N:'Knight',P:'Pawn'};return`https://chessasset.vercel.app/${col}${nm[t]}.png`;}},
+  neo:{fn:(c,t)=>{const BASE='https://images.chesscomfiles.com/chess-themes/pieces/neo/150/';const M={wK:'wk',wQ:'wq',wR:'wr',wB:'wb',wN:'wn',wP:'wp',bK:'bk',bQ:'bq',bR:'br',bB:'bb',bN:'bn',bP:'bp'};return BASE+(M[c+t]||'')+'.png';}}
+};
+window.pickTheme=function(name,el){
+  localStorage.setItem('co_piece_theme',name);
+  document.querySelectorAll('.theme-card').forEach(e=>e.classList.toggle('active',e.dataset.theme===name));
+};
+function buildThemePreviews(){
+  const cur=localStorage.getItem('co_piece_theme')||'classic';
+  ['classic','wood','neo'].forEach(th=>{
+    const pr=document.getElementById('idx-prev-'+th);
+    if(!pr)return;
+    const t=IDX_THEMES[th];
+    [['w','K'],['b','Q'],['w','P'],['b','P']].forEach(([c,p],i)=>{
+      const img=document.createElement('img');img.src=t.fn(c,p);
+      img.style.background=i%2===0?'#f0d9b5':'#b58863';
+      pr.appendChild(img);
+    });
+  });
+}
+
 // Modal helpers
 window.openModal=function(id){
   closeAllDropdowns();
@@ -971,6 +1032,11 @@ window.openModal=function(id){
   if(id==='friendsModal') loadFriends();
   if(id==='inboxModal') loadInbox();
   if(id==='updateModal') loadUpdate();
+  if(id==='settingsModal'){
+    buildThemePreviews();
+    const cur=localStorage.getItem('co_piece_theme')||'classic';
+    document.querySelectorAll('.theme-card').forEach(e=>e.classList.toggle('active',e.dataset.theme===cur));
+  }
 };
 window.closeModal=function(id){document.getElementById(id).classList.remove('show')};
 window.closeOnBg=function(e,id){if(e.target.id===id)closeModal(id)};
