@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>ChessOrion – Offline</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--g:#c9a84c;--dk:#0a0a0f;--p:#14141e;--bd:#2a2a3a;--tx:#e8e8f0;--mu:#888899}
+html,body{height:100%;background:var(--dk);color:var(--tx);font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+.wrap{max-width:320px}
+.king{font-size:4rem;margin-bottom:16px;filter:grayscale(1);opacity:.5}
+h1{font-size:1.4rem;color:var(--g);margin-bottom:10px;letter-spacing:.08em;font-weight:700}
+p{color:var(--mu);font-size:.95rem;line-height:1.6;margin-bottom:24px}
+button{padding:14px 32px;background:linear-gradient(135deg,#8b6914,var(--g));color:#0a0a0f;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:.05em}
+button:active{opacity:.85}
+.board{display:grid;grid-template-columns:repeat(4,36px);gap:0;margin:0 auto 24px;width:144px;border-radius:6px;overflow:hidden;opacity:.2}
+.sq{width:36px;height:36px;font-size:1.4rem;display:flex;align-items:center;justify-content:center}
+.L{background:#f0d9b5}.D{background:#b58863}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="board">
+    <div class="sq D">♜</div><div class="sq L">♞</div><div class="sq D">♝</div><div class="sq L">♛</div>
+    <div class="sq L"></div><div class="sq D"></div><div class="sq L"></div><div class="sq D"></div>
+    <div class="sq D"></div><div class="sq L"></div><div class="sq D"></div><div class="sq L"></div>
+    <div class="sq L">♖</div><div class="sq D">♘</div><div class="sq L">♗</div><div class="sq D">♕</div>
+  </div>
+  <h1>♔ You're Offline</h1>
+  <p>ChessOrion needs an internet connection to play. Please check your connection and try again.</p>
+  <button onclick="location.reload()">↺ Try Again</button>
+</div>
+</body>
+</html>

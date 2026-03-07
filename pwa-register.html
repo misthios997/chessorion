@@ -1,0 +1,32 @@
+<!-- ═══ SW REGISTER — paste before </body> of index.html only ═══ -->
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js')
+      .then(r=>console.log('SW registered, scope:',r.scope))
+      .catch(e=>console.warn('SW failed:',e));
+  });
+  // PWA install prompt — show "Add to Home Screen" button if available
+  let deferredPrompt=null;
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();deferredPrompt=e;
+    // Show custom install button if exists
+    const btn=document.getElementById('installBtn');
+    if(btn){btn.style.display='flex';}
+  });
+  window.addEventListener('appinstalled',()=>{
+    deferredPrompt=null;
+    const btn=document.getElementById('installBtn');
+    if(btn)btn.style.display='none';
+  });
+  window.installPWA=()=>{
+    if(!deferredPrompt)return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(r=>{
+      console.log('PWA install:',r.outcome);
+      deferredPrompt=null;
+    });
+  };
+}
+</script>
+<!-- ═══ END SW REGISTER ═══ -->
