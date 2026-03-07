@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.chessorion.twa",
+    "sha256_cert_fingerprints": [
+      "16:14:B6:24:54:F7:ED:35:94:C7:DB:04:7C:95:CD:EE:FF:76:6B:9F:55:84:1B:73:71:EF:10:67:A2:3A:36:2C"
+    ]
+  }
+}]
