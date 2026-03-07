@@ -22,7 +22,7 @@
 html,body{height:100%;overflow:hidden;touch-action:none;overscroll-behavior:none;background:var(--dk)}
 body{font-family:'Crimson Pro',serif;color:var(--tx);-webkit-user-select:none;user-select:none;display:flex;flex-direction:column}
 /* topbar */
-.tb{height:48px;min-height:48px;background:#10101899;backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:50}
+.tb{min-height:calc(48px + env(safe-area-inset-top,0px));background:#10101899;backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);display:flex;align-items:center;padding-left:14px;padding-right:14px;padding-top:env(safe-area-inset-top,0px);gap:10px;flex-shrink:0;z-index:50}
 .logo{font-family:'Cinzel',serif;font-size:1rem;color:var(--g);font-weight:900;margin-right:auto}
 /* main layout – flex column fills remaining height */
 .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:6px;min-height:0;overflow:hidden}
