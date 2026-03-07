@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessOrion – Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --gold:#c9a84c;--gold2:#e8c96d;--dark:#0a0a0f;--dark2:#111118;
+    --panel:#14141e;--border:#2a2a3a;--text:#e8e8f0;--muted:#888899;
+    --error:#e05555;--success:#55c088;
+  }
+  body{
+    font-family:'Crimson Pro',serif;background:var(--dark);color:var(--text);
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  /* Starfield BG */
+  .bg{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 30% 20%,#1a1030 0%,#0a0a0f 60%)}
+  .stars{position:fixed;inset:0;z-index:0}
+  .star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--t,3s) infinite alternate}
+  @keyframes twinkle{0%{opacity:.1}100%{opacity:.8}}
+  .board-bg{
+    position:fixed;bottom:-60px;right:-60px;width:480px;height:480px;
+    opacity:.04;z-index:0;
+    background-image:repeating-conic-gradient(#fff 0% 25%,transparent 0% 50%);
+    background-size:60px 60px;transform:rotate(12deg);
+  }
+  /* Orion constellation lines */
+  svg.constellation{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;opacity:.18;pointer-events:none}
+
+  .container{
+    position:relative;z-index:10;width:100%;max-width:440px;padding:20px;
+  }
+  .logo{
+    text-align:center;margin-bottom:36px;
+  }
+  .logo h1{
+    font-family:'Cinzel',serif;font-size:2.4rem;font-weight:900;letter-spacing:.12em;
+    background:linear-gradient(135deg,var(--gold),var(--gold2),#fff8dc);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    text-shadow:none;
+  }
+  .logo p{font-size:.95rem;color:var(--muted);letter-spacing:.25em;margin-top:4px;font-style:italic}
+  .logo .king-icon{font-size:2.8rem;display:block;margin-bottom:8px;filter:drop-shadow(0 0 12px #c9a84c88)}
+
+  .card{
+    background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    padding:36px;box-shadow:0 24px 80px #00000088,0 0 0 1px #ffffff08 inset;
+    backdrop-filter:blur(8px);
+  }
+  .tabs{display:flex;gap:0;margin-bottom:28px;border-bottom:1px solid var(--border)}
+  .tab{
+    flex:1;padding:12px;text-align:center;cursor:pointer;font-family:'Cinzel',serif;
+    font-size:.85rem;letter-spacing:.1em;color:var(--muted);transition:.2s;
+    border-bottom:2px solid transparent;margin-bottom:-1px;
+  }
+  .tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+  .tab:hover:not(.active){color:var(--text)}
+
+  .form-group{margin-bottom:18px}
+  label{display:block;font-size:.8rem;letter-spacing:.12em;color:var(--muted);margin-bottom:6px;text-transform:uppercase}
+  input{
+    width:100%;padding:12px 14px;background:#0d0d18;border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-family:'Crimson Pro',serif;font-size:1rem;
+    transition:.2s;outline:none;
+  }
+  input:focus{border-color:var(--gold);box-shadow:0 0 0 3px #c9a84c18}
+  input::placeholder{color:#444455}
+
+  .btn{
+    width:100%;padding:14px;font-family:'Cinzel',serif;font-size:.9rem;letter-spacing:.15em;
+    font-weight:700;border:none;border-radius:8px;cursor:pointer;transition:.2s;
+    position:relative;overflow:hidden;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,#8b6914,var(--gold),#e8c96d);color:#0a0a0f;
+    box-shadow:0 4px 24px #c9a84c44;
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 32px #c9a84c66}
+  .btn-primary:active{transform:translateY(0)}
+  .btn-primary::after{
+    content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,#ffffff22,transparent);
+    transform:translateX(-100%);transition:.4s;
+  }
+  .btn-primary:hover::after{transform:translateX(100%)}
+
+  .msg{
+    padding:10px 14px;border-radius:8px;font-size:.9rem;margin-bottom:14px;display:none;
+  }
+  .msg.error{background:#e0555518;border:1px solid #e0555544;color:var(--error);display:block}
+  .msg.success{background:#55c08818;border:1px solid #55c08844;color:var(--success);display:block}
+
+  .divider{text-align:center;color:var(--muted);font-size:.8rem;margin:16px 0;position:relative}
+  .divider::before,.divider::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:var(--border)}
+  .divider::before{left:0}.divider::after{right:0}
+
+  .forgot{text-align:right;margin-top:-10px;margin-bottom:14px}
+  .forgot a{color:var(--muted);font-size:.8rem;text-decoration:none;cursor:pointer}
+  .forgot a:hover{color:var(--gold)}
+
+  .panel{display:none}.panel.active{display:block}
+
+  #loadOverlay{
+    position:fixed;inset:0;background:var(--dark);z-index:999;display:flex;
+    align-items:center;justify-content:center;flex-direction:column;gap:16px;
+    transition:opacity .6s;
+  }
+  #loadOverlay.hidden{opacity:0;pointer-events:none}
+  .spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .load-text{font-family:'Cinzel',serif;color:var(--gold);letter-spacing:.2em;font-size:.85rem}
+
+  /* Anti-right-click / inspect overlay for assets */
+  body{-webkit-user-select:none;user-select:none}
+</style>
+</head>
+<body>
+<div id="loadOverlay">
+  <div class="spinner"></div>
+  <div class="load-text">CHESSORION</div>
+</div>
+
+<div class="bg"></div>
+<div class="stars" id="stars"></div>
+<div class="board-bg"></div>
+<svg class="constellation" viewBox="0 0 1440 900">
+  <!-- Orion belt stars -->
+  <circle cx="720" cy="200" r="3" fill="#c9a84c"/>
+  <circle cx="760" cy="210" r="2" fill="#c9a84c"/>
+  <circle cx="800" cy="200" r="3" fill="#c9a84c"/>
+  <line x1="720" y1="200" x2="760" y2="210" stroke="#c9a84c" stroke-width="1"/>
+  <line x1="760" y1="210" x2="800" y2="200" stroke="#c9a84c" stroke-width="1"/>
+  <!-- Shoulders -->
+  <circle cx="660" cy="130" r="4" fill="#aaddff"/>
+  <circle cx="860" cy="120" r="5" fill="#ffaaaa"/>
+  <line x1="660" y1="130" x2="720" y2="200" stroke="#c9a84c" stroke-width=".8"/>
+  <line x1="860" y1="120" x2="800" y2="200" stroke="#c9a84c" stroke-width=".8"/>
+  <!-- Feet -->
+  <circle cx="680" cy="310" r="3" fill="#aaddff"/>
+  <circle cx="840" cy="320" r="4" fill="#aaddff"/>
+  <line x1="720" y1="200" x2="680" y2="310" stroke="#c9a84c" stroke-width=".8"/>
+  <line x1="800" y1="200" x2="840" y2="320" stroke="#c9a84c" stroke-width=".8"/>
+  <!-- Head -->
+  <circle cx="750" cy="60" r="3" fill="#ffffaa"/>
+  <line x1="660" y1="130" x2="750" y2="60" stroke="#c9a84c" stroke-width=".6"/>
+  <line x1="860" y1="120" x2="750" y2="60" stroke="#c9a84c" stroke-width=".6"/>
+</svg>
+
+<div class="container">
+  <div class="logo">
+    <span class="king-icon">♔</span>
+    <h1>ChessOrion</h1>
+    <p>Where Legends Play</p>
+  </div>
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('login')">Login</div>
+      <div class="tab" onclick="switchTab('register')">Register</div>
+    </div>
+
+    <!-- Login Panel -->
+    <div class="panel active" id="loginPanel">
+      <div id="loginMsg" class="msg"></div>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="loginUser" placeholder="Enter username" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPass" placeholder="Enter password">
+      </div>
+      <div class="forgot"><a onclick="forgotPw()">Forgot password?</a></div>
+      <button class="btn btn-primary" id="loginBtn" data-label="Enter the Board" onclick="doLogin()">Enter the Board</button>
+    </div>
+
+    <!-- Register Panel -->
+    <div class="panel" id="registerPanel">
+      <div id="regMsg" class="msg"></div>
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="regUser" placeholder="Choose a username" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="regEmail" placeholder="your@email.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="regPass" placeholder="Min 6 characters">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="regPass2" placeholder="Repeat password">
+      </div>
+      <button class="btn btn-primary" id="regBtn" data-label="Create Account" onclick="doRegister()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  onAuthStateChanged, sendPasswordResetEmail, setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, getDoc, serverTimestamp,
+  enableIndexedDbPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:"AIzaSyBDFWnGF4gG7nRrqwGAlxL-EOZiSPXs7kM",
+  authDomain:"chessorion-cb690.firebaseapp.com",
+  projectId:"chessorion-cb690",
+  storageBucket:"chessorion-cb690.firebasestorage.app",
+  messagingSenderId:"936378240439",
+  appId:"1:936378240439:web:7a578803271ea9b7a52c32",
+  measurementId:"G-EKJ7MJZ56Z"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Set auth persistence
+await setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+// Only redirect if already logged in (don't await Firestore on auth state - just check auth)
+let initialCheckDone = false;
+onAuthStateChanged(auth, user => {
+  if(initialCheckDone) return;
+  initialCheckDone = true;
+  if(user) {
+    window.location.replace('index.html');
+  } else {
+    hideLoader();
+  }
+});
+
+// Safety fallback: hide loader after 3s even if Firebase hangs
+setTimeout(hideLoader, 3000);
+
+function hideLoader(){
+  const ov = document.getElementById('loadOverlay');
+  if(ov) ov.classList.add('hidden');
+}
+
+function showMsg(id, type, text){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = 'msg ' + type;
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
+function hideMsg(id){
+  const el = document.getElementById(id);
+  if(el){ el.style.display = 'none'; }
+}
+
+function setLoading(btnId, loading){
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Please wait...' : btn.dataset.label;
+}
+
+function genPlayerId(){
+  return 'CO-' + Math.random().toString(36).substr(2,8).toUpperCase();
+}
+
+window.switchTab = function(tab){
+  document.querySelectorAll('.tab').forEach((t,i) =>
+    t.classList.toggle('active', i === (tab === 'login' ? 0 : 1))
+  );
+  document.getElementById('loginPanel').classList.toggle('active', tab === 'login');
+  document.getElementById('registerPanel').classList.toggle('active', tab === 'register');
+  hideMsg('loginMsg'); hideMsg('regMsg');
+};
+
+window.doLogin = async function(){
+  const usernameOrEmail = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if(!usernameOrEmail || !pass){ showMsg('loginMsg','error','Please fill in all fields.'); return; }
+
+  hideMsg('loginMsg');
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Signing in...';
+
+  try {
+    let email = usernameOrEmail;
+
+    // If not an email, look up by username
+    if(!usernameOrEmail.includes('@')) {
+      let uSnap;
+      try {
+        uSnap = await getDoc(doc(db, 'usernames', usernameOrEmail.toLowerCase()));
+      } catch(fetchErr) {
+        showMsg('loginMsg','error','Connection error. Check your internet and try again.');
+        btn.disabled = false; btn.textContent = orig; return;
+      }
+      if(!uSnap.exists()){
+        showMsg('loginMsg','error','Username not found. Check spelling or register first.');
+        btn.disabled = false; btn.textContent = orig; return;
+      }
+      email = uSnap.data().email;
+    }
+
+    await signInWithEmailAndPassword(auth, email, pass);
+    window.location.replace('index.html');
+
+  } catch(e) {
+    let msg = 'Wrong username or password.';
+    const code = e.code || '';
+    if(code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+      msg = 'Wrong password. Please try again.';
+    } else if(code === 'auth/too-many-requests') {
+      msg = 'Too many attempts. Try again later.';
+    } else if(code === 'auth/network-request-failed') {
+      msg = 'Network error. Check your internet connection.';
+    } else if(code === 'auth/invalid-email') {
+      msg = 'Invalid email format.';
+    } else if(code) {
+      msg = 'Login failed: ' + code;
+    }
+    showMsg('loginMsg','error', msg);
+    btn.disabled = false; btn.textContent = orig;
+  }
+};
+
+window.doRegister = async function(){
+  const username = document.getElementById('regUser').value.trim();
+  const email    = document.getElementById('regEmail').value.trim();
+  const pass     = document.getElementById('regPass').value;
+  const pass2    = document.getElementById('regPass2').value;
+
+  if(!username||!email||!pass||!pass2){ showMsg('regMsg','error','Please fill in all fields.'); return; }
+  if(pass !== pass2){ showMsg('regMsg','error','Passwords do not match.'); return; }
+  if(pass.length < 6){ showMsg('regMsg','error','Password must be at least 6 characters.'); return; }
+  if(!/^[a-zA-Z0-9_]{3,20}$/.test(username)){
+    showMsg('regMsg','error','Username: 3–20 chars, letters/numbers/underscore only.'); return;
+  }
+
+  hideMsg('regMsg');
+  const btn = document.getElementById('regBtn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Creating account...';
+
+  try {
+    // Check if username taken
+    const uRef = doc(db, 'usernames', username.toLowerCase());
+    let uSnap;
+    try {
+      uSnap = await getDoc(uRef);
+    } catch(fetchErr) {
+      showMsg('regMsg','error','Connection error. Check your internet and try again.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    if(uSnap.exists()){
+      showMsg('regMsg','error','Username already taken. Choose another.');
+      btn.disabled = false; btn.textContent = orig; return;
+    }
+
+    // Create auth user
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const uid = cred.user.uid;
+    const pid = genPlayerId();
+
+    // Save user doc
+    await setDoc(doc(db, 'users', uid), {
+      username, email, uid, playerId: pid, elo: 500,
+      createdAt: serverTimestamp(),
+      banned: false, isAdmin: false,
+      isOwner: username === 'Jovan',
+      avatar: '', gameHistory: [], friends: [], friendRequests: []
+    });
+    // Save username lookup
+    await setDoc(doc(db, 'usernames', username.toLowerCase()), { uid, email });
+
+    showMsg('regMsg','success','Account created! Redirecting...');
+    window.location.replace('index.html');
+
+  } catch(e) {
+    let msg = e.message || 'Registration failed.';
+    if(e.code === 'auth/email-already-in-use') msg = 'Email already in use. Try logging in.';
+    else if(e.code === 'auth/invalid-email') msg = 'Invalid email address.';
+    else if(e.code === 'auth/network-request-failed') msg = 'Network error. Check your internet connection.';
+    showMsg('regMsg','error', msg);
+    btn.disabled = false; btn.textContent = orig;
+  }
+};
+
+window.forgotPw = async function(){
+  const username = document.getElementById('loginUser').value.trim();
+  if(!username){ showMsg('loginMsg','error','Enter your username above first.'); return; }
+  try {
+    const uSnap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
+    if(!uSnap.exists()){ showMsg('loginMsg','error','Username not found.'); return; }
+    await sendPasswordResetEmail(auth, uSnap.data().email);
+    showMsg('loginMsg','success','Password reset email sent! Check your inbox.');
+  } catch(e) {
+    showMsg('loginMsg','error','Could not send reset email. Try again.');
+  }
+};
+</script>
+
+<script>
+// Stars
+(()=>{
+  const c=document.getElementById('stars');
+  for(let i=0;i<120;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=Math.random()*2.5+.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--t:${2+Math.random()*4}s;opacity:${Math.random()*.6}`;
+    c.appendChild(s);
+  }
+})();
+
+// Disable right-click
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{
+  if(e.key==='F12'||(e.ctrlKey&&(e.key==='u'||e.key==='s'||e.key==='i'))){e.preventDefault();}
+});
+
+// Enter key support
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    if(document.getElementById('loginPanel').classList.contains('active')) window.doLogin?.();
+    else window.doRegister?.();
+  }
+});
+</script>
+</body>
+</html>
