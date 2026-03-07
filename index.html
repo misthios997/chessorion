@@ -256,7 +256,7 @@ input,select,textarea{font-size:16px!important}
   <div class="nav-item" onclick="openModal('friendsModal')"><span class="ico">➕</span> Add Friend</div>
   <div class="nav-item" id="updateNavItem" onclick="openModal('updateModal')"><span class="ico">🔄</span> Update</div>
   <div class="nav-item" onclick="openModal('settingsModal')"><span class="ico">⚙️</span> Settings</div>
-  <div class="nav-item" id="installBtn" onclick="installPWA()" style="display:none"><span class="ico">📲</span> Install App</div>
+  <div class="nav-item" id="installBtn" onclick="installPWA()"><span class="ico">📲</span> Install App</div>
   <div class="nav-item" id="adminNavItem" style="display:none" onclick="openModal('adminModal')"><span class="ico">⚙️</span> Admin Panel</div>
 </div>
 
@@ -529,6 +529,50 @@ input,select,textarea{font-size:16px!important}
       </div>
     </div>
     <div id="adminMsg" style="color:var(--success);font-size:.9rem;margin-top:8px"></div>
+  </div>
+</div>
+</div>
+
+<!-- Install Guide Modal -->
+<div class="overlay" id="installGuideModal" onclick="closeOnBg(event,'installGuideModal')">
+<div class="modal">
+  <div class="modal-header">
+    <span class="modal-title">📲 Install ChessOrion</span>
+    <button class="close-btn" onclick="closeModal('installGuideModal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="section-title" style="margin-bottom:14px">Cara install sebagai App</div>
+
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--gold);margin-bottom:8px">🤖 Android (Chrome)</div>
+      <div style="font-size:.88rem;color:var(--text);line-height:1.8">
+        1. Tap menu <strong>⋮</strong> di pojok kanan atas<br>
+        2. Pilih <strong>"Add to Home Screen"</strong><br>
+        3. Tap <strong>Install</strong> → Done!
+      </div>
+    </div>
+
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--gold);margin-bottom:8px">🍎 iPhone / iPad (Safari)</div>
+      <div style="font-size:.88rem;color:var(--text);line-height:1.8">
+        1. Buka di <strong>Safari</strong> (bukan Chrome)<br>
+        2. Tap tombol <strong>Share ↑</strong> di bawah layar<br>
+        3. Pilih <strong>"Add to Home Screen"</strong><br>
+        4. Tap <strong>Add</strong> → Done!
+      </div>
+    </div>
+
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--gold);margin-bottom:8px">💻 Desktop (Chrome/Edge)</div>
+      <div style="font-size:.88rem;color:var(--text);line-height:1.8">
+        1. Lihat ikon <strong>⊕</strong> di address bar kanan<br>
+        2. Klik → <strong>Install</strong>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;padding:10px;background:#c9a84c12;border:1px solid #c9a84c44;border-radius:8px;font-size:.8rem;color:var(--muted);text-align:center">
+      ✨ Setelah install, app berjalan fullscreen<br>tanpa browser bar — seperti app asli!
+    </div>
   </div>
 </div>
 </div>
@@ -1090,7 +1134,11 @@ if('serviceWorker' in navigator){
   let _dp=null;
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_dp=e;const b=document.getElementById('installBtn');if(b)b.style.display='flex';});
   window.addEventListener('appinstalled',()=>{_dp=null;const b=document.getElementById('installBtn');if(b)b.style.display='none';});
-  window.installPWA=()=>{if(!_dp)return;_dp.prompt();_dp.userChoice.then(()=>{_dp=null;});};
+  window.installPWA=()=>{
+    if(_dp){_dp.prompt();_dp.userChoice.then(r=>{if(r.outcome==='accepted'){_dp=null;document.getElementById('installBtn').innerHTML='<span class="ico">✅</span> Installed';}});return;}
+    // Tidak ada prompt (iOS Safari atau sudah install) — tampilkan panduan manual
+    openModal('installGuideModal');
+  };
 }
 </script>
 </body>
