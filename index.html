@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ChessOrion">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <meta name="referrer" content="no-referrer">
 <title>ChessOrion</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
@@ -29,7 +29,7 @@ body{font-family:'Crimson Pro',serif;background:var(--dark);color:var(--text);mi
 .bg{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 20% 10%,#1a1030 0%,#0a0a0f 70%)}
 .board-bg{position:fixed;bottom:-40px;right:-40px;width:400px;height:400px;opacity:.03;z-index:0;background-image:repeating-conic-gradient(#fff 0% 25%,transparent 0% 50%);background-size:50px 50px;transform:rotate(8deg)}
 /* Topbar */
-.topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:#10101888;backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;height:56px;gap:16px}
+.topbar{padding-top:env(safe-area-inset-top,0px);position:fixed;top:0;left:0;right:0;z-index:100;background:#10101888;backdrop-filter:blur(16px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;height:56px;gap:16px}
 .menu-btn{width:40px;height:40px;display:flex;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;padding:8px;border-radius:8px;transition:.2s}
 .menu-btn:hover{background:var(--panel)}
 .menu-btn span{display:block;width:24px;height:2px;background:var(--gold);border-radius:2px;transition:.3s}
@@ -203,7 +203,7 @@ input,select,textarea{font-size:16px!important}
   .admin-row{flex-wrap:wrap}
   .hero-btns{flex-direction:column;align-items:stretch;width:100%;max-width:290px}
   .hero-btn{text-align:center;padding:16px}
-  .topbar{padding:0 12px;gap:10px}
+  .topbar{padding-top:env(safe-area-inset-top,0px);padding:0 12px;gap:10px}
   .user-elo{font-size:.76rem}
   .time-btn{padding:11px 14px;font-size:.9rem;min-height:44px}
   .btn-row{flex-direction:column}
@@ -256,7 +256,6 @@ input,select,textarea{font-size:16px!important}
   <div class="nav-item" onclick="openModal('friendsModal')"><span class="ico">➕</span> Add Friend</div>
   <div class="nav-item" id="updateNavItem" onclick="openModal('updateModal')"><span class="ico">🔄</span> Update</div>
   <div class="nav-item" onclick="openModal('settingsModal')"><span class="ico">⚙️</span> Settings</div>
-  <div class="nav-item" id="installBtn" onclick="installPWA()"><span class="ico">📲</span> Install App</div>
   <div class="nav-item" id="adminNavItem" style="display:none" onclick="openModal('adminModal')"><span class="ico">⚙️</span> Admin Panel</div>
 </div>
 
@@ -532,16 +531,6 @@ input,select,textarea{font-size:16px!important}
   </div>
 </div>
 </div>
-
-<!-- Install Guide Modal -->
-<div class="overlay" id="installGuideModal" onclick="closeOnBg(event,'installGuideModal')">
-<div class="modal">
-  <div class="modal-header">
-    <span class="modal-title">📲 Install ChessOrion</span>
-    <button class="close-btn" onclick="closeModal('installGuideModal')">✕</button>
-  </div>
-  <div class="modal-body">
-    <div class="section-title" style="margin-bottom:14px">Cara install sebagai App</div>
 
     <div style="background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">
       <div style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--gold);margin-bottom:8px">🤖 Android (Chrome)</div>
@@ -1131,15 +1120,13 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('/sw.js').catch(()=>{});
   });
-  let _dp=null;
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_dp=e;const b=document.getElementById('installBtn');if(b)b.style.display='flex';});
-  window.addEventListener('appinstalled',()=>{_dp=null;const b=document.getElementById('installBtn');if(b)b.style.display='none';});
-  window.installPWA=()=>{
-    if(_dp){_dp.prompt();_dp.userChoice.then(r=>{if(r.outcome==='accepted'){_dp=null;document.getElementById('installBtn').innerHTML='<span class="ico">✅</span> Installed';}});return;}
-    // Tidak ada prompt (iOS Safari atau sudah install) — tampilkan panduan manual
-    openModal('installGuideModal');
-  };
 }
+</script>
+<script>
+// Hide browser address bar on load
+window.addEventListener('load',()=>{
+  setTimeout(()=>{window.scrollTo(0,1);},100);
+});
 </script>
 </body>
 </html>
